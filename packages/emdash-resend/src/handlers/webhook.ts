@@ -16,6 +16,12 @@ interface ResendWebhookEvent {
   };
 }
 
+function isWebhookEvent(value: unknown): value is ResendWebhookEvent {
+  if (!value || typeof value !== "object") return false;
+  const maybe = value as { type?: unknown; data?: { email_id?: unknown } };
+  return typeof maybe.type === "string" && !!maybe.data && typeof maybe.data.email_id === "string";
+}
+
 function asIsoString(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const parsed = new Date(value);
@@ -51,7 +57,18 @@ export async function handleWebhook(ctx: any): Promise<{ ok: boolean }> {
     throw PluginRouteError.unauthorized("Webhook not configured. Re-register it in plugin settings.");
   }
 
-  const rawBody = await ctx.request.text();
+  // EmDash consumes JSON bodies before plugin route handlers run (ctx.input).
+  // Rebuild the signed payload from ctx.input in that case.
+  let rawBody: string;
+  if (ctx.input !== undefined) {
+    try {
+      rawBody = JSON.stringify(ctx.input);
+    } catch {
+      throw PluginRouteError.badRequest("Invalid webhook payload");
+    }
+  } else {
+    rawBody = await ctx.request.text();
+  }
 
   const valid = await verifySvixSignature(rawBody, {
     "svix-id": ctx.request.headers.get("svix-id") ?? "",
@@ -63,12 +80,17 @@ export async function handleWebhook(ctx: any): Promise<{ ok: boolean }> {
     throw PluginRouteError.unauthorized("Invalid webhook signature");
   }
 
-  let event: ResendWebhookEvent;
-  try {
-    event = JSON.parse(rawBody) as ResendWebhookEvent;
-  } catch {
-    throw PluginRouteError.badRequest("Invalid webhook payload");
+  let event: ResendWebhookEvent | null = null;
+  if (isWebhookEvent(ctx.input)) event = ctx.input;
+  if (!event) {
+    try {
+      const parsed = JSON.parse(rawBody) as unknown;
+      if (isWebhookEvent(parsed)) event = parsed;
+    } catch {
+      // handled below
+    }
   }
+  if (!event) throw PluginRouteError.badRequest("Invalid webhook payload");
 
   const { type, data } = event;
   const emailId = data.email_id;

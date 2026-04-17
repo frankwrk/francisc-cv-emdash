@@ -22,7 +22,7 @@ async function makeWebhookCtx(payload: unknown, secret = SVIX_SECRET) {
   const ctx = makeMockCtx({ kv: { "settings:webhookSecret": secret } });
   return {
     ...ctx,
-    input: {},
+    input: payload,
     request: new Request("https://example.com/_emdash/api/plugins/emdash-resend/webhook", {
       method: "POST",
       body,
@@ -118,6 +118,24 @@ describe("handleWebhook", () => {
         status: "delivered",
         openedAt: "2026-04-17T08:56:50.762Z",
       })
+    );
+  });
+
+  it("handles webhook when request body stream is already consumed", async () => {
+    const payload = { type: "email.delivered", data: { email_id: "email_abc" } };
+    const ctx = await makeWebhookCtx(payload);
+    ctx.storage.deliveries.get = vi.fn().mockResolvedValue({
+      resendId: "email_abc", to: "u@u.com", subject: "Hi", status: "sent", createdAt: "2024-01-01T00:00:00Z"
+    });
+
+    // EmDash runtime parses JSON first; this consumes the stream.
+    await ctx.request.json();
+
+    await handleWebhook(ctx as any);
+
+    expect(ctx.storage.deliveries.put).toHaveBeenCalledWith(
+      "email_abc",
+      expect.objectContaining({ status: "delivered" })
     );
   });
 });

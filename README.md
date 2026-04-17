@@ -50,6 +50,12 @@ pnpm dev
 
 `pnpm dev` and `pnpm build` run a `predev` / `prebuild` step that compiles the local workspace package `@frankwrk/emdash-resend` first. This ensures its `dist/*` exports exist before Astro loads `astro.config.mjs` in fresh environments (including Cloudflare CI).
 
+## Resend Webhook Notes
+
+- The webhook signing secret is stored in plugin KV as `settings:webhookSecret` when the webhook is registered from plugin settings.
+- If Resend webhook calls fail auth, re-register the webhook from the plugin settings so both `webhookId` and `webhookSecret` are refreshed.
+- EmDash route handlers receive parsed JSON in `ctx.input`; webhook signature verification in this plugin is performed against that JSON payload representation.
+
 ## Git Hygiene
 
 This repository should not track local runtime state, generated artifacts, or secrets.
