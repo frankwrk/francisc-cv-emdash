@@ -25,6 +25,7 @@ interface DeliverEvent {
 
 interface CloudflareProviderConfig {
   apiToken: string | null;
+  authEmail: string | null;
   accountId: string | null;
   zoneId: string | null;
   fromAddress: string | null;
@@ -67,6 +68,18 @@ function trimOrNull(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function formatAuthErrorDetail(error: unknown, config: CloudflareProviderConfig): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const looksLikeAuthError = /auth/i.test(message) || /invalid access token/i.test(message);
+  if (!looksLikeAuthError) return message;
+
+  if (config.authEmail) {
+    return `${message} Verify the Global API key + auth email pair, and ensure the key has access to the target account/zone.`;
+  }
+
+  return `${message} The plugin uses API token auth by default. If you are using a Global API key, fill in Auth email as well.`;
+}
+
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
@@ -100,6 +113,7 @@ function normalizeRouteAddress(routeAddress: string | null, sendingDomain: strin
 async function getConfig(ctx: any): Promise<CloudflareProviderConfig> {
   const [
     apiToken,
+    authEmail,
     accountId,
     zoneId,
     fromAddress,
@@ -112,6 +126,7 @@ async function getConfig(ctx: any): Promise<CloudflareProviderConfig> {
     sendEmailBindingName,
   ] = await Promise.all([
     ctx.kv.get("settings:cloudflare:apiToken") as Promise<string | null>,
+    ctx.kv.get("settings:cloudflare:authEmail") as Promise<string | null>,
     ctx.kv.get("settings:cloudflare:accountId") as Promise<string | null>,
     ctx.kv.get("settings:cloudflare:zoneId") as Promise<string | null>,
     ctx.kv.get("settings:cloudflare:fromAddress") as Promise<string | null>,
@@ -126,6 +141,7 @@ async function getConfig(ctx: any): Promise<CloudflareProviderConfig> {
 
   return {
     apiToken: trimOrNull(apiToken),
+    authEmail: trimOrNull(authEmail),
     accountId: trimOrNull(accountId),
     zoneId: trimOrNull(zoneId),
     fromAddress: trimOrNull(fromAddress),
@@ -153,6 +169,7 @@ async function saveConfig(ctx: any, input: Partial<CloudflareProviderConfig>): P
   };
 
   setOrDelete("settings:cloudflare:apiToken", input.apiToken);
+  setOrDelete("settings:cloudflare:authEmail", input.authEmail);
   setOrDelete("settings:cloudflare:accountId", input.accountId);
   setOrDelete("settings:cloudflare:zoneId", input.zoneId);
   setOrDelete("settings:cloudflare:fromAddress", input.fromAddress);
@@ -193,7 +210,9 @@ function getClient(config: CloudflareProviderConfig, ctx?: any): CloudflareEmail
       ? ctx.http.fetch.bind(ctx.http)
       : undefined;
 
-  return new CloudflareEmailClient(config.apiToken, scopedFetch);
+  return new CloudflareEmailClient(config.apiToken, scopedFetch, {
+    apiEmail: config.authEmail ?? undefined,
+  });
 }
 
 export async function getCloudflareSettings(ctx: any): Promise<Record<string, unknown>> {
@@ -201,6 +220,7 @@ export async function getCloudflareSettings(ctx: any): Promise<Record<string, un
 
   return {
     apiToken: config.apiToken ? maskSecret(config.apiToken) : null,
+    authEmail: config.authEmail,
     accountId: config.accountId,
     zoneId: config.zoneId,
     fromAddress: config.fromAddress,
@@ -217,6 +237,7 @@ export async function getCloudflareSettings(ctx: any): Promise<Record<string, un
 export async function saveCloudflareSettings(ctx: any, input: Record<string, unknown>): Promise<void> {
   await saveConfig(ctx, {
     apiToken: trimOrNull(input.apiToken),
+    authEmail: trimOrNull(input.authEmail),
     accountId: trimOrNull(input.accountId),
     zoneId: trimOrNull(input.zoneId),
     fromAddress: trimOrNull(input.fromAddress),
@@ -325,10 +346,18 @@ export async function getCloudflareReadiness(ctx: any): Promise<CloudflareReadin
 
   addCheck({
     id: "api-token",
-    label: "API token configured",
+    label: "Cloudflare API credential configured",
     required: true,
     ok: Boolean(config.apiToken),
     detail: config.apiToken ? "Configured" : "Missing",
+  });
+
+  addCheck({
+    id: "auth-email",
+    label: "Auth email (required for Global API key auth)",
+    required: false,
+    ok: Boolean(config.authEmail),
+    detail: config.authEmail ? "Configured" : "Not set (OK for API token auth)",
   });
 
   addCheck({
@@ -403,7 +432,7 @@ export async function getCloudflareReadiness(ctx: any): Promise<CloudflareReadin
         label: "Cloudflare sending domain onboarded",
         required: true,
         ok: false,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: formatAuthErrorDetail(error, config),
       });
     }
 
@@ -425,7 +454,7 @@ export async function getCloudflareReadiness(ctx: any): Promise<CloudflareReadin
         label: "Email Routing enabled",
         required: true,
         ok: false,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: formatAuthErrorDetail(error, config),
       });
     }
   } else {
@@ -478,7 +507,7 @@ export async function getCloudflareReadiness(ctx: any): Promise<CloudflareReadin
         label: "Destination address verified (for Worker routing)",
         required: false,
         ok: false,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: formatAuthErrorDetail(error, config),
       });
     }
   }

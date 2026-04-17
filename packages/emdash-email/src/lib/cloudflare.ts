@@ -133,21 +133,29 @@ function todayIsoDate(): string {
 
 export class CloudflareEmailClient {
   constructor(
-    private apiToken: string,
+    private apiCredential: string,
     private fetchFn: FetchFn = fetch,
-    private apiBase = "https://api.cloudflare.com/client/v4"
+    private options: {
+      apiBase?: string;
+      apiEmail?: string;
+    } = {}
   ) {}
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers ?? {});
-    headers.set("Authorization", `Bearer ${this.apiToken}`);
+    if (this.options.apiEmail) {
+      headers.set("X-Auth-Email", this.options.apiEmail);
+      headers.set("X-Auth-Key", this.apiCredential);
+    } else {
+      headers.set("Authorization", `Bearer ${this.apiCredential}`);
+    }
 
     const hasBody = init.body !== undefined && init.body !== null;
     if (hasBody && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
 
-    const response = await this.fetchFn(`${this.apiBase}${path}`, {
+    const response = await this.fetchFn(`${this.options.apiBase ?? "https://api.cloudflare.com/client/v4"}${path}`, {
       ...init,
       headers,
     });

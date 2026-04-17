@@ -109,6 +109,7 @@ export async function handleSaveSettings(ctx: any): Promise<{ success: boolean; 
   // Flat cloudflare fields are also accepted for convenience.
   const flatCloudflareFields = [
     "apiToken",
+    "authEmail",
     "accountId",
     "zoneId",
     "sendingDomain",

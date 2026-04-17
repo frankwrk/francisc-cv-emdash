@@ -57,4 +57,37 @@ describe("CloudflareEmailClient", () => {
       })
     ).rejects.toThrow("invalid token");
   });
+
+  it("uses X-Auth headers when auth email is provided (Global API key mode)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          result: {
+            delivered: ["user@example.com"],
+            queued: [],
+            permanent_bounces: [],
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    const client = new CloudflareEmailClient("global_api_key_value", fetchMock as any, {
+      apiEmail: "owner@example.com",
+    });
+
+    await client.sendEmail("acc_1", {
+      to: "user@example.com",
+      from: "noreply@example.com",
+      subject: "Hello",
+      text: "world",
+    });
+
+    const requestInit = (fetchMock.mock.calls[0] as any[])[1] as RequestInit;
+    const headers = new Headers(requestInit.headers);
+    expect(headers.get("X-Auth-Email")).toBe("owner@example.com");
+    expect(headers.get("X-Auth-Key")).toBe("global_api_key_value");
+    expect(headers.get("Authorization")).toBeNull();
+  });
 });
