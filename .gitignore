@@ -1,7 +1,34 @@
-node_modules
-dist
-.astro
-uploads
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build and test outputs
+dist/
+coverage/
+*.tsbuildinfo
+
+# Astro cache
+.astro/
+
+# EmDash local media + local DB
+uploads/
 data.db
-.wrangler/state
+data.db-*
+
+# Cloudflare local runtime state
+.wrangler/
+
+# Local tool state
 .claude/settings.local.json
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+dev.vars
+.dev.vars
+.dev.vars.*
+
+# Logs and OS/editor noise
+*.log
+.DS_Store

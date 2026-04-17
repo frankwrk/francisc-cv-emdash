@@ -48,7 +48,24 @@ pnpm bootstrap
 pnpm dev
 ```
 
-`pnpm dev` and `pnpm build` now run a `predev`/`prebuild` step that compiles the local workspace package `@frankwrk/emdash-resend` first. This guarantees its `dist/*` exports exist before Astro loads `astro.config.mjs` in fresh environments (including Cloudflare CI).
+`pnpm dev` and `pnpm build` run a `predev` / `prebuild` step that compiles the local workspace package `@frankwrk/emdash-resend` first. This ensures its `dist/*` exports exist before Astro loads `astro.config.mjs` in fresh environments (including Cloudflare CI).
+
+## Git Hygiene
+
+This repository should not track local runtime state, generated artifacts, or secrets.
+
+- Ignored by default:
+  - dependencies/build: `node_modules/`, `dist/`, `coverage/`, `*.tsbuildinfo`
+  - local runtime data: `.astro/`, `.wrangler/`, `uploads/`, `data.db*`
+  - secrets/local env: `.env*`, `.dev.vars*`, `dev.vars` (except `.env.example`)
+  - noise: `*.log`, `.DS_Store`
+- If files were tracked before these rules, untrack once:
+
+```bash
+git rm -r --cached .wrangler
+```
+
+Then commit the `.gitignore` update.
 
 ## Deploying
 
