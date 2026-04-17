@@ -1,5 +1,6 @@
 import cloudflare from "@astrojs/cloudflare";
 import react from "@astrojs/react";
+import tailwindcss from "@tailwindcss/vite";
 import { d1, r2, sandbox } from "@emdash-cms/cloudflare";
 import { formsPlugin } from "@emdash-cms/plugin-forms";
 import { webhookNotifierPlugin } from "@emdash-cms/plugin-webhook-notifier";
@@ -42,4 +43,7 @@ export default defineConfig({
 		},
 	],
 	devToolbar: { enabled: false },
+	vite: {
+		plugins: [tailwindcss()],
+	},
 });
