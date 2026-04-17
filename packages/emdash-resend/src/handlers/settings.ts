@@ -10,17 +10,34 @@ function maskApiKey(key: string): string {
   return key.slice(0, 4) + "•".repeat(Math.max(0, key.length - 8)) + key.slice(-4);
 }
 
+async function getWebhookRegistrationState(ctx: any): Promise<{
+  webhookId: string | null;
+  webhookSecret: string | null;
+  webhookRegistered: boolean;
+}> {
+  const [webhookId, webhookSecret] = await Promise.all([
+    ctx.kv.get<string>("settings:webhookId"),
+    ctx.kv.get<string>("settings:webhookSecret"),
+  ]);
+
+  return {
+    webhookId: webhookId ?? null,
+    webhookSecret: webhookSecret ?? null,
+    webhookRegistered: Boolean(webhookId && webhookSecret),
+  };
+}
+
 export async function handleGetSettings(ctx: any): Promise<Record<string, unknown>> {
-  const apiKey = await ctx.kv.get("settings:apiKey");
-  const fromAddress = await ctx.kv.get("settings:fromAddress");
-  const fromName = await ctx.kv.get("settings:fromName");
-  const webhookId = await ctx.kv.get("settings:webhookId");
+  const apiKey = await ctx.kv.get<string>("settings:apiKey");
+  const fromAddress = await ctx.kv.get<string>("settings:fromAddress");
+  const fromName = await ctx.kv.get<string>("settings:fromName");
+  const { webhookId, webhookRegistered } = await getWebhookRegistrationState(ctx);
 
   return {
     apiKey: apiKey ? maskApiKey(apiKey) : null,
     fromAddress: fromAddress ?? null,
     fromName: fromName ?? null,
-    webhookRegistered: Boolean(webhookId),
+    webhookRegistered,
     webhookId: webhookId ?? null,
   };
 }
@@ -39,10 +56,10 @@ export async function handleSaveSettings(ctx: any): Promise<{ success: boolean }
   const origin = new URL(ctx.request.url).origin;
   await ctx.kv.set("settings:siteUrl", origin);
 
-  const resolvedApiKey = apiKey ?? await ctx.kv.get("settings:apiKey");
-  const webhookId = await ctx.kv.get("settings:webhookId");
+  const resolvedApiKey = apiKey ?? await ctx.kv.get<string>("settings:apiKey");
+  const { webhookId, webhookSecret } = await getWebhookRegistrationState(ctx);
 
-  if (resolvedApiKey && !webhookId) {
+  if (resolvedApiKey && (!webhookId || !webhookSecret)) {
     try {
       const webhookUrl = `${origin}/_emdash/api/plugins/emdash-resend/webhook`;
       const client = new ResendClient(resolvedApiKey, ctx.http.fetch.bind(ctx.http));
@@ -58,11 +75,11 @@ export async function handleSaveSettings(ctx: any): Promise<{ success: boolean }
 }
 
 export async function handleTestEmail(ctx: any): Promise<{ success: boolean; error?: string }> {
-  const apiKey = await ctx.kv.get("settings:apiKey");
+  const apiKey = await ctx.kv.get<string>("settings:apiKey");
   if (!apiKey) throw new Error("API key not configured");
 
-  const fromAddress = await ctx.kv.get("settings:fromAddress");
-  const fromName = await ctx.kv.get("settings:fromName");
+  const fromAddress = await ctx.kv.get<string>("settings:fromAddress");
+  const fromName = await ctx.kv.get<string>("settings:fromName");
 
   if (!fromAddress) throw new Error("From address not configured");
 
@@ -85,17 +102,17 @@ export async function handleTestEmail(ctx: any): Promise<{ success: boolean; err
 }
 
 export async function handleGetWebhookStatus(ctx: any): Promise<{ registered: boolean; webhookId?: string }> {
-  const webhookId = await ctx.kv.get("settings:webhookId");
-  return webhookId
+  const { webhookId, webhookRegistered } = await getWebhookRegistrationState(ctx);
+  return webhookRegistered && webhookId
     ? { registered: true, webhookId }
     : { registered: false };
 }
 
 export async function handleRegisterWebhook(ctx: any): Promise<{ success: boolean; webhookId: string }> {
-  const apiKey = await ctx.kv.get("settings:apiKey");
+  const apiKey = await ctx.kv.get<string>("settings:apiKey");
   if (!apiKey) throw new Error("API key not configured");
 
-  const existingWebhookId = await ctx.kv.get("settings:webhookId");
+  const existingWebhookId = await ctx.kv.get<string>("settings:webhookId");
   const origin = new URL(ctx.request.url).origin;
   const webhookUrl = `${origin}/_emdash/api/plugins/emdash-resend/webhook`;
   const client = new ResendClient(apiKey, ctx.http.fetch.bind(ctx.http));

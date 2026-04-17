@@ -43,7 +43,7 @@ export function createPlugin(): ResolvedPlugin {
 
     storage: {
       deliveries: {
-        indexes: ["status", "createdAt", "to"],
+        indexes: ["status", "createdAt", "to", "resendId"],
       },
     },
 

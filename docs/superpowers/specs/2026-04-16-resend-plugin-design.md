@@ -202,6 +202,13 @@ Write a `deliveries` record with `status: "sent"` and the Resend email ID as the
 
 Returns `200` immediately. Resend retries on non-2xx.
 
+### Reliability update (2026-04-17)
+
+- Route handlers now throw `PluginRouteError` for webhook auth/validation failures instead of native `Response`. This prevents EmDash from downgrading expected auth failures into generic `500 INTERNAL_ERROR` responses.
+- Webhook processing now **upserts** delivery rows when no existing local record is found, so the Delivery Log page can show webhook-driven events (including emails sent outside the plugin transport path).
+- Webhook registration status now requires both `settings:webhookId` and `settings:webhookSecret`; save flow re-registers automatically when the ID exists but the secret is missing.
+- Svix signature parsing now accepts broader `svix-signature` header formats (space- or comma-delimited `v1,...` signatures).
+
 ---
 
 ## Admin Pages

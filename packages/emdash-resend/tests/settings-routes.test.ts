@@ -15,6 +15,7 @@ describe("handleGetSettings", () => {
         "settings:fromAddress": "hi@example.com",
         "settings:fromName": "My Site",
         "settings:webhookId": "wh_123",
+        "settings:webhookSecret": "whsec_abc",
       },
     });
 
@@ -31,6 +32,12 @@ describe("handleGetSettings", () => {
 
   it("returns webhookRegistered: false when no webhookId", async () => {
     const ctx = makeRouteMockCtx({}, { kv: { "settings:apiKey": "re_live_secret" } });
+    const result = await handleGetSettings(ctx as any);
+    expect(result.webhookRegistered).toBe(false);
+  });
+
+  it("returns webhookRegistered: false when webhookId exists but secret is missing", async () => {
+    const ctx = makeRouteMockCtx({}, { kv: { "settings:webhookId": "wh_123" } });
     const result = await handleGetSettings(ctx as any);
     expect(result.webhookRegistered).toBe(false);
   });
@@ -72,6 +79,33 @@ describe("handleSaveSettings", () => {
     expect(ctx.kv.set).toHaveBeenCalledWith("settings:siteUrl", "https://mysite.com");
     expect(ctx.kv.set).toHaveBeenCalledWith("settings:webhookId", "wh_new");
   });
+
+  it("re-registers webhook when webhookId exists but secret is missing", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: "wh_newer", signing_secret: "whsec_newer" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    const ctx = makeRouteMockCtx(
+      { fromAddress: "x@y.com" },
+      {
+        method: "POST",
+        url: "https://mysite.com/_emdash/api/plugins/emdash-resend/settings/save",
+        kv: {
+          "settings:apiKey": "re_existing_key",
+          "settings:webhookId": "wh_existing",
+        },
+        fetchImpl: fetchMock,
+      }
+    );
+
+    await handleSaveSettings(ctx as any);
+
+    expect(ctx.kv.set).toHaveBeenCalledWith("settings:webhookId", "wh_newer");
+    expect(ctx.kv.set).toHaveBeenCalledWith("settings:webhookSecret", "whsec_newer");
+  });
 });
 
 describe("handleGetWebhookStatus", () => {
@@ -81,11 +115,22 @@ describe("handleGetWebhookStatus", () => {
     expect(result.registered).toBe(false);
   });
 
-  it("returns registered: true when webhookId exists", async () => {
-    const ctx = makeRouteMockCtx({}, { kv: { "settings:webhookId": "wh_123" } });
+  it("returns registered: true when webhookId and secret exist", async () => {
+    const ctx = makeRouteMockCtx({}, {
+      kv: {
+        "settings:webhookId": "wh_123",
+        "settings:webhookSecret": "whsec_abc",
+      },
+    });
     const result = await handleGetWebhookStatus(ctx as any);
     expect(result.registered).toBe(true);
     expect(result.webhookId).toBe("wh_123");
+  });
+
+  it("returns registered: false when webhookId exists but secret is missing", async () => {
+    const ctx = makeRouteMockCtx({}, { kv: { "settings:webhookId": "wh_123" } });
+    const result = await handleGetWebhookStatus(ctx as any);
+    expect(result.registered).toBe(false);
   });
 });
 

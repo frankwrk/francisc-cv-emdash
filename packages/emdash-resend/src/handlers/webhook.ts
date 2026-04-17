@@ -1,20 +1,54 @@
+import { PluginRouteError } from "emdash";
 import { verifySvixSignature } from "../lib/webhook-verify.js";
 
 interface ResendWebhookEvent {
   type: string;
+  created_at?: string;
   data: {
     email_id: string;
+    created_at?: string;
+    subject?: string;
+    to?: string[];
+    open?: { timestamp?: string };
+    click?: { timestamp?: string };
+    bounce?: { timestamp?: string };
     [key: string]: unknown;
   };
+}
+
+function asIsoString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.valueOf()) ? undefined : parsed.toISOString();
+}
+
+function normalizeRecipients(value: unknown): string {
+  if (!Array.isArray(value)) return "";
+  return value.filter((item): item is string => typeof item === "string").join(", ");
+}
+
+async function findDeliveryRecord(ctx: any, emailId: string): Promise<{ id: string; record: Record<string, unknown> } | null> {
+  const byId = await ctx.storage.deliveries.get(emailId);
+  if (byId) return { id: emailId, record: byId };
+
+  try {
+    const byResendId = await ctx.storage.deliveries.query({
+      where: { resendId: emailId },
+      limit: 1,
+    });
+    const item = byResendId?.items?.[0];
+    if (item?.id && item?.data?.resendId === emailId) return { id: item.id, record: item.data };
+  } catch {
+    // Some stores may not support this query shape/index -- ignore and create fresh record below.
+  }
+
+  return null;
 }
 
 export async function handleWebhook(ctx: any): Promise<{ ok: boolean }> {
   const secret = await ctx.kv.get("settings:webhookSecret");
   if (!secret) {
-    throw new Response(JSON.stringify({ error: "Webhook not configured" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
+    throw PluginRouteError.unauthorized("Webhook not configured. Re-register it in plugin settings.");
   }
 
   const rawBody = await ctx.request.text();
@@ -26,22 +60,36 @@ export async function handleWebhook(ctx: any): Promise<{ ok: boolean }> {
   }, secret);
 
   if (!valid) {
-    throw new Response(JSON.stringify({ error: "Invalid signature" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
+    throw PluginRouteError.unauthorized("Invalid webhook signature");
   }
 
-  const event = JSON.parse(rawBody) as ResendWebhookEvent;
+  let event: ResendWebhookEvent;
+  try {
+    event = JSON.parse(rawBody) as ResendWebhookEvent;
+  } catch {
+    throw PluginRouteError.badRequest("Invalid webhook payload");
+  }
+
   const { type, data } = event;
   const emailId = data.email_id;
 
   if (!emailId) return { ok: true };
 
-  const existing = await ctx.storage.deliveries.get(emailId);
-  if (!existing) return { ok: true };
+  const existingRecord = await findDeliveryRecord(ctx, emailId);
+  const now = new Date().toISOString();
+  const createdAt = asIsoString(data.created_at) ?? asIsoString(event.created_at) ?? now;
 
-  const updates: Record<string, unknown> = { ...existing };
+  const updates: Record<string, unknown> = existingRecord
+    ? { ...existingRecord.record }
+    : {
+        resendId: emailId,
+        to: normalizeRecipients(data.to),
+        subject: typeof data.subject === "string" ? data.subject : "",
+        status: "sent",
+        createdAt,
+      };
+
+  const eventTimestamp = asIsoString(event.created_at) ?? now;
 
   switch (type) {
     case "email.sent":
@@ -54,19 +102,22 @@ export async function handleWebhook(ctx: any): Promise<{ ok: boolean }> {
       break;
     case "email.bounced":
       updates.status = "bounced";
-      updates.bouncedAt = new Date().toISOString();
+      updates.bouncedAt = asIsoString(data.bounce?.timestamp) ?? eventTimestamp;
       break;
     case "email.complained":
       updates.status = "complained";
       break;
     case "email.opened":
-      if (!existing.openedAt) updates.openedAt = new Date().toISOString();
+      if (!updates.openedAt) updates.openedAt = asIsoString(data.open?.timestamp) ?? eventTimestamp;
+      if (updates.status === "sent") updates.status = "delivered";
       break;
     case "email.clicked":
-      if (!existing.clickedAt) updates.clickedAt = new Date().toISOString();
+      if (!updates.clickedAt) updates.clickedAt = asIsoString(data.click?.timestamp) ?? eventTimestamp;
+      if (updates.status === "sent") updates.status = "delivered";
       break;
   }
 
-  await ctx.storage.deliveries.put(emailId, updates);
+  const storageId = existingRecord?.id ?? emailId;
+  await ctx.storage.deliveries.put(storageId, updates);
   return { ok: true };
 }

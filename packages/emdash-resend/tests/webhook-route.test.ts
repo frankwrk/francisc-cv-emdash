@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { PluginRouteError } from "emdash";
 import { handleWebhook } from "../src/handlers/webhook.js";
 import { makeMockCtx } from "./helpers.js";
 
@@ -61,7 +62,10 @@ describe("handleWebhook", () => {
     });
     (ctx as any).request = badRequest;
 
-    await expect(handleWebhook(ctx as any)).rejects.toBeDefined();
+    await expect(handleWebhook(ctx as any)).rejects.toMatchObject<Partial<PluginRouteError>>({
+      code: "UNAUTHORIZED",
+      status: 401,
+    });
   });
 
   it("writes openedAt on email.opened only when not already set", async () => {
@@ -87,5 +91,33 @@ describe("handleWebhook", () => {
 
     const putCall = (ctx.storage.deliveries.put as any).mock.calls[0][1];
     expect(putCall.openedAt).toBe("2024-01-01T01:00:00Z");
+  });
+
+  it("creates a delivery record when webhook arrives before local send log exists", async () => {
+    const ctx = await makeWebhookCtx({
+      type: "email.opened",
+      created_at: "2026-04-17T08:56:50.762Z",
+      data: {
+        email_id: "44a1e02d-97c9-47ed-a4cf-b0e62530b307",
+        created_at: "2026-04-17T08:56:17.593Z",
+        subject: "EmDash Resend plugin — test email",
+        to: ["francisc.frd@gmail.com"],
+        open: { timestamp: "2026-04-17T08:56:50.762Z" },
+      },
+    });
+    ctx.storage.deliveries.get = vi.fn().mockResolvedValue(null);
+
+    await handleWebhook(ctx as any);
+
+    expect(ctx.storage.deliveries.put).toHaveBeenCalledWith(
+      "44a1e02d-97c9-47ed-a4cf-b0e62530b307",
+      expect.objectContaining({
+        resendId: "44a1e02d-97c9-47ed-a4cf-b0e62530b307",
+        to: "francisc.frd@gmail.com",
+        subject: "EmDash Resend plugin — test email",
+        status: "delivered",
+        openedAt: "2026-04-17T08:56:50.762Z",
+      })
+    );
   });
 });

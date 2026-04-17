@@ -67,4 +67,14 @@ describe("verifySvixSignature", () => {
     }, SVIX_SECRET);
     expect(result).toBe(true);
   });
+
+  it("accepts a valid v1 signature from a comma-delimited list", async () => {
+    const sig1 = await sign(SVIX_SECRET, svixId, nowSeconds, body);
+    const result = await verifySvixSignature(body, {
+      "svix-id": svixId,
+      "svix-timestamp": nowSeconds,
+      "svix-signature": `v1,invalidsig==,${sig1},v0,oldsig==`,
+    }, SVIX_SECRET);
+    expect(result).toBe(true);
+  });
 });

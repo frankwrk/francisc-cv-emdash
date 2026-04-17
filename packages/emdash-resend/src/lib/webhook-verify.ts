@@ -5,6 +5,18 @@ export interface SvixHeaders {
 }
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
+const SVIX_V1_SIGNATURE_RE = /(?:^|\s|,)v1,([A-Za-z0-9+/=]+)(?=$|\s|,)/g;
+
+function extractV1Signatures(svixSignature: string): string[] {
+  const regexMatches = [...svixSignature.matchAll(SVIX_V1_SIGNATURE_RE)].map((match) => match[1]);
+  if (regexMatches.length > 0) return regexMatches;
+
+  // Fallback for simple single-signature values.
+  return svixSignature
+    .split(/\s+/)
+    .map((token) => token.trim().replace(/^v1,/, "").replace(/,$/, ""))
+    .filter(Boolean);
+}
 
 export async function verifySvixSignature(
   rawBody: string,
@@ -44,7 +56,7 @@ export async function verifySvixSignature(
   const sigBuffer = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signedPayload));
   const computedSig = btoa(String.fromCharCode(...new Uint8Array(sigBuffer)));
 
-  const signatures = svixSignature.split(" ").map((s) => s.replace(/^v1,/, ""));
+  const signatures = extractV1Signatures(svixSignature);
   return signatures.some((sig) => sig === computedSig);
 }
 
