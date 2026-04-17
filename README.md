@@ -81,7 +81,11 @@ pnpm dev
 
 ## Cloudflare Email Provider Setup
 
-- Minimum required fields for sending: API token, Account ID, and sender email (`fromAddress`).
+- Authentication modes supported:
+  - API token (default): set API token/key field only.
+  - Global API key: set API token/key field to your Global API key and also fill `Auth email`.
+- Reason for this distinction: Cloudflare API tokens use `Authorization: Bearer ...`, while Global API keys require `X-Auth-Email` + `X-Auth-Key`.
+- Minimum required fields for sending: API credential (token or key), Account ID, and sender email (`fromAddress`).
 - For inbound/routing workflows and worker setup, also set: Zone ID, sending domain, route address, destination address, worker name, and optional `sendEmailBindingName`.
 - Use the Settings page actions:
   - `Refresh checklist` to re-run readiness diagnostics.
