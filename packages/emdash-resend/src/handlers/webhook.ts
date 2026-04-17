@@ -9,7 +9,7 @@ interface ResendWebhookEvent {
 }
 
 export async function handleWebhook(ctx: any): Promise<{ ok: boolean }> {
-  const secret = await ctx.kv.get<string>("settings:webhookSecret");
+  const secret = await ctx.kv.get("settings:webhookSecret");
   if (!secret) {
     throw new Response(JSON.stringify({ error: "Webhook not configured" }), {
       status: 401,

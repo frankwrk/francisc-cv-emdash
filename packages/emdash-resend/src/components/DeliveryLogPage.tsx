@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { api } from "./api.js";
 
 type DeliveryStatus = "sent" | "delivered" | "bounced" | "complained" | "delayed";
@@ -95,30 +95,33 @@ export function DeliveryLogPage() {
         </thead>
         <tbody>
           {deliveries.map((d) => (
-            <tr
-              key={d.id}
-              onClick={() => setSelectedId(selectedId === d.id ? null : d.id)}
-              style={{ cursor: "pointer", borderBottom: "1px solid #f3f4f6" }}
-            >
-              <td style={{ padding: "0.5rem", fontFamily: "monospace", fontSize: "0.85rem" }}>{d.to}</td>
-              <td style={{ padding: "0.5rem" }}>{d.subject}</td>
-              <td style={{ padding: "0.5rem" }}>
-                <span style={{ color: STATUS_COLORS[d.status] ?? "#888", fontWeight: 500 }}>
-                  {d.status}
-                </span>
-              </td>
-              <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>
-                {new Date(d.createdAt).toLocaleString()}
-              </td>
-              <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>
-                {d.openedAt ? new Date(d.openedAt).toLocaleString() : "—"}
-              </td>
-              {selectedId === d.id && (
-                <td colSpan={5} style={{ padding: "0.5rem", background: "#f9fafb", fontSize: "0.8rem", fontFamily: "monospace" }}>
-                  Resend ID: {d.resendId}
+            <Fragment key={d.id}>
+              <tr
+                onClick={() => setSelectedId(selectedId === d.id ? null : d.id)}
+                style={{ cursor: "pointer", borderBottom: "1px solid #f3f4f6" }}
+              >
+                <td style={{ padding: "0.5rem", fontFamily: "monospace", fontSize: "0.85rem" }}>{d.to}</td>
+                <td style={{ padding: "0.5rem" }}>{d.subject}</td>
+                <td style={{ padding: "0.5rem" }}>
+                  <span style={{ color: STATUS_COLORS[d.status] ?? "#888", fontWeight: 500 }}>
+                    {d.status}
+                  </span>
                 </td>
+                <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>
+                  {new Date(d.createdAt).toLocaleString()}
+                </td>
+                <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>
+                  {d.openedAt ? new Date(d.openedAt).toLocaleString() : "—"}
+                </td>
+              </tr>
+              {selectedId === d.id && (
+                <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <td colSpan={5} style={{ padding: "0.5rem", background: "#f9fafb", fontSize: "0.8rem", fontFamily: "monospace" }}>
+                    Resend ID: {d.resendId}
+                  </td>
+                </tr>
               )}
-            </tr>
+            </Fragment>
           ))}
         </tbody>
       </table>

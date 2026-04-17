@@ -4,10 +4,12 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"predev": "pnpm --filter @frankwrk/emdash-resend build",
 		"dev": "astro dev",
+		"prebuild": "pnpm --filter @frankwrk/emdash-resend build",
 		"build": "astro build",
 		"preview": "astro preview",
-		"deploy": "astro build && wrangler deploy",
+		"deploy": "pnpm run build && wrangler deploy",
 		"typecheck": "astro check",
 		"bootstrap": "emdash init && emdash seed",
 		"seed": "emdash seed"

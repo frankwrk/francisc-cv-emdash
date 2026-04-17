@@ -21,6 +21,31 @@ export interface MockCollection {
   count: ReturnType<typeof vi.fn>;
 }
 
+export interface MockCtx {
+  kv: MockKV;
+  storage: {
+    deliveries: MockCollection;
+  };
+  http: {
+    fetch: ReturnType<typeof vi.fn>;
+  };
+  log: {
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    debug: ReturnType<typeof vi.fn>;
+  };
+  plugin: {
+    id: string;
+    version: string;
+  };
+}
+
+export interface RouteMockCtx extends MockCtx {
+  input: unknown;
+  request: Request;
+}
+
 export function makeMockKV(initial: Record<string, unknown> = {}): MockKV {
   const store = new Map<string, unknown>(Object.entries(initial));
   return {
@@ -69,8 +94,8 @@ export function makeMockCollection(initial: Record<string, unknown> = {}): MockC
 export function makeMockCtx(overrides: {
   kv?: Record<string, unknown>;
   deliveries?: Record<string, unknown>;
-  fetchImpl?: typeof vi.fn;
-} = {}) {
+  fetchImpl?: ReturnType<typeof vi.fn>;
+} = {}): MockCtx {
   const fetchMock = overrides.fetchImpl ?? vi.fn();
   return {
     kv: makeMockKV(overrides.kv ?? {}),
@@ -85,8 +110,8 @@ export function makeMockCtx(overrides: {
 
 export function makeRouteMockCtx(
   input: unknown,
-  options: { method?: string; url?: string; kv?: Record<string, unknown>; fetchImpl?: typeof vi.fn } = {}
-) {
+  options: { method?: string; url?: string; kv?: Record<string, unknown>; fetchImpl?: ReturnType<typeof vi.fn> } = {}
+): RouteMockCtx {
   const ctx = makeMockCtx({ kv: options.kv, fetchImpl: options.fetchImpl });
   return {
     ...ctx,

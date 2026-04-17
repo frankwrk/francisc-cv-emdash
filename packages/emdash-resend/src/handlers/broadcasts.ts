@@ -1,7 +1,7 @@
 import { ResendClient } from "../lib/resend.js";
 
 async function getClient(ctx: any): Promise<ResendClient> {
-  const apiKey = await ctx.kv.get<string>("settings:apiKey");
+  const apiKey = await ctx.kv.get("settings:apiKey");
   if (!apiKey) throw new Error("API key not configured");
   return new ResendClient(apiKey, ctx.http.fetch.bind(ctx.http));
 }

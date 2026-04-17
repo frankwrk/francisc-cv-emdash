@@ -274,6 +274,53 @@ All routes mount at `/_emdash/api/plugins/emdash-resend/<route>`. Admin routes e
 
 ---
 
+## Post-review Hardening (2026-04-17)
+
+The first implementation pass was hardened after a correctness/maintainability review.
+
+1. **Peer compatibility declared explicitly for current stack**
+   - Updated `packages/emdash-resend/package.json` peers to:
+     - `@emdash-cms/admin:^0.4.0`
+     - `emdash:^0.4.0`
+     - `react:^19.0.0`
+   - Also aligned `@types/react` to `^19.2.0` in plugin dev dependencies.
+   - Reasoning: avoid false incompatibility signals and peer resolution failures on this workspace.
+
+2. **Duplicate-send risk reduced on post-send persistence failures**
+   - Updated `packages/emdash-resend/src/handlers/deliver.ts` so `ctx.storage.deliveries.put(...)` is best-effort after a successful provider send.
+   - On storage failure, the handler logs a warning and does not throw.
+   - Reasoning: once Resend accepts the message, throwing on local log-write failures can trigger retries and duplicate outbound emails.
+
+3. **Manual webhook re-register now reconciles existing webhook first**
+   - Updated `packages/emdash-resend/src/handlers/settings.ts` (`handleRegisterWebhook`) to:
+     - read existing `settings:webhookId`
+     - attempt deletion before registering a new webhook
+     - continue past "not found" delete responses, but fail on other delete errors
+   - Reasoning: repeated manual re-register operations should not leak parallel active webhooks.
+
+4. **Local runtime artifacts are now ignored and removed from VCS**
+   - Updated `.gitignore` to exclude:
+     - `.wrangler/state`
+     - `.claude/settings.local.json`
+   - Removed tracked `.wrangler/state/*` files and `.claude/settings.local.json`.
+   - Reasoning: these are machine-local/generated files and created non-reproducible commit noise.
+
+5. **Svix replay window now rejects future timestamps**
+   - Updated `packages/emdash-resend/src/lib/webhook-verify.ts` to enforce a symmetric ±5 minute skew window (`abs(now - timestamp)`).
+   - Reasoning: old-only checks allow attacker-controlled far-future timestamps to bypass freshness checks.
+
+6. **Delivery log table row structure corrected**
+   - Updated `packages/emdash-resend/src/components/DeliveryLogPage.tsx` to render expanded detail in a separate `<tr><td colSpan={5}>`.
+   - Reasoning: appending an extra `<td>` to the main row produced invalid table structure and inconsistent rendering/accessibility behavior.
+
+7. **Typecheck portability cleanup**
+   - Updated handler KV calls to remove invalid generic type arguments on untyped runtime context APIs (`ctx.kv.get<string>(...)` -> `ctx.kv.get(...)`).
+   - Updated `packages/emdash-resend/src/lib/webhook-verify.ts` to normalize the HMAC key into an explicitly ArrayBuffer-backed `Uint8Array` before `crypto.subtle.importKey(...)`, satisfying strict DOM WebCrypto typings.
+   - Updated `packages/emdash-resend/tests/helpers.ts` with explicit `MockCtx` / `RouteMockCtx` return types and correct `fetchImpl` mock-instance typing.
+   - Reasoning: this removes TS2742/TS2322 portability issues and keeps strict `tsc --noEmit` green in workspace installs.
+
+---
+
 ## Out of Scope
 
 - Resend dashboard templates (user composes content inline in EmDash)

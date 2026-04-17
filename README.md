@@ -48,6 +48,8 @@ pnpm bootstrap
 pnpm dev
 ```
 
+`pnpm dev` and `pnpm build` now run a `predev`/`prebuild` step that compiles the local workspace package `@frankwrk/emdash-resend` first. This guarantees its `dist/*` exports exist before Astro loads `astro.config.mjs` in fresh environments (including Cloudflare CI).
+
 ## Deploying
 
 ```bash

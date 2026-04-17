@@ -3,3 +3,5 @@ dist
 .astro
 uploads
 data.db
+.wrangler/state
+.claude/settings.local.json
