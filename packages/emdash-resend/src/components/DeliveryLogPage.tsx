@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { api } from "./api.js";
 import { Badge, Button, Notice, Table } from "./ui.js";
 
@@ -75,12 +75,46 @@ export function DeliveryLogPage() {
     setCursor(undefined);
   };
 
+  const metrics = useMemo(() => {
+    const total = deliveries.length;
+    const delivered = deliveries.filter((item) => item.status === "delivered").length;
+    const opened = deliveries.filter((item) => Boolean(item.openedAt)).length;
+    const bounced = deliveries.filter((item) => item.status === "bounced").length;
+    const deliveryRate = total > 0 ? Math.round((delivered / total) * 100) : 0;
+    const openRate = delivered > 0 ? Math.round((opened / delivered) * 100) : 0;
+
+    return { total, delivered, bounced, opened, deliveryRate, openRate };
+  }, [deliveries]);
+
   return (
     <div className="re-page re-stack">
       <header>
         <h1 className="re-title">Delivery Log</h1>
         <p className="re-subtitle">Inspect recipient-level delivery activity, opens, and provider event details.</p>
       </header>
+
+      <section className="re-metrics" aria-label="Delivery metrics">
+        <article className="re-metric">
+          <p className="re-metric-label">Loaded events</p>
+          <p className="re-metric-value">{metrics.total}</p>
+          <p className="re-metric-note">Current filtered dataset</p>
+        </article>
+        <article className="re-metric">
+          <p className="re-metric-label">Delivered</p>
+          <p className="re-metric-value">{metrics.delivered}</p>
+          <p className="re-metric-note">{metrics.deliveryRate}% delivery rate</p>
+        </article>
+        <article className="re-metric">
+          <p className="re-metric-label">Opened</p>
+          <p className="re-metric-value">{metrics.opened}</p>
+          <p className="re-metric-note">{metrics.openRate}% open rate (of delivered)</p>
+        </article>
+        <article className="re-metric">
+          <p className="re-metric-label">Bounced</p>
+          <p className="re-metric-value">{metrics.bounced}</p>
+          <p className="re-metric-note">Investigate sender/domain health</p>
+        </article>
+      </section>
 
       <div className="re-inline-actions">
         {STATUS_FILTERS.map((filter) => (

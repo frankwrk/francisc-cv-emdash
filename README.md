@@ -63,6 +63,10 @@ pnpm dev
 - The active tab is mirrored to `?tab=` in the URL for refresh-safe navigation.
 - The tab shell and page controls are now built from plugin-local shadcn-style primitives (`Button`, `Card`, `Input`, `Select`, `Textarea`, `Badge`, `Table`, `Notice`) in `packages/emdash-resend/src/components/ui.tsx`.
 - Styling is scoped in `packages/emdash-resend/src/components/resend-admin-styles.tsx` so plugin UI updates do not leak into the site theme.
+- Complete design pass notes:
+  - Upgraded typography/spacing hierarchy and state styling for a professional CMS plugin surface.
+  - Added per-page metric summaries for faster operational scanning (deliverability, contacts, broadcasts, setup readiness).
+  - Added accessibility-focused tab semantics (`tablist` / `tab` / `tabpanel`) for keyboard/screen-reader clarity.
 - Page details retained from the original workflow:
   - `Delivery Log`: status filters, expandable Resend ID row, open timestamp column.
   - `Contacts`: audience selector, inline add-contact form, unsubscribe/delete actions.

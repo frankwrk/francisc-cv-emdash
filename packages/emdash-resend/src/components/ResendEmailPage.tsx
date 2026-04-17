@@ -42,7 +42,15 @@ export function ResendEmailPage() {
     <div className="re-shell">
       <ResendAdminStyles />
 
-      <div className="re-topbar">
+      <header className="re-app-header">
+        <span className="re-app-badge">Resend Plugin</span>
+        <div>
+          <h1 className="re-app-title">Resend Email</h1>
+          <p className="re-app-subtitle">Delivery analytics, contacts, broadcasts, and provider settings in one workflow.</p>
+        </div>
+      </header>
+
+      <div className="re-topbar" role="tablist" aria-label="Resend sections">
         <div className="re-tabs">
           {TABS.map((tab) => {
             const active = tab.key === activeTab;
@@ -52,7 +60,11 @@ export function ResendEmailPage() {
                 size="sm"
                 variant={active ? "default" : "outline"}
                 onClick={() => setActiveTab(tab.key)}
+                role="tab"
+                aria-selected={active}
                 aria-current={active ? "page" : undefined}
+                aria-controls={`re-panel-${tab.key}`}
+                id={`re-tab-${tab.key}`}
               >
                 {tab.label}
               </Button>
@@ -61,10 +73,26 @@ export function ResendEmailPage() {
         </div>
       </div>
 
-      {activeTab === "delivery-log" && <DeliveryLogPage />}
-      {activeTab === "contacts" && <ContactsPage />}
-      {activeTab === "broadcasts" && <BroadcastsPage />}
-      {activeTab === "settings" && <SettingsPage />}
+      {activeTab === "delivery-log" && (
+        <section id="re-panel-delivery-log" role="tabpanel" aria-labelledby="re-tab-delivery-log">
+          <DeliveryLogPage />
+        </section>
+      )}
+      {activeTab === "contacts" && (
+        <section id="re-panel-contacts" role="tabpanel" aria-labelledby="re-tab-contacts">
+          <ContactsPage />
+        </section>
+      )}
+      {activeTab === "broadcasts" && (
+        <section id="re-panel-broadcasts" role="tabpanel" aria-labelledby="re-tab-broadcasts">
+          <BroadcastsPage />
+        </section>
+      )}
+      {activeTab === "settings" && (
+        <section id="re-panel-settings" role="tabpanel" aria-labelledby="re-tab-settings">
+          <SettingsPage />
+        </section>
+      )}
     </div>
   );
 }

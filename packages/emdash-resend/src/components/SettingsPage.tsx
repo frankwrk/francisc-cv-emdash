@@ -118,109 +118,133 @@ export function SettingsPage() {
         <p className="re-subtitle">Configure API credentials, sender defaults, and webhook registration.</p>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>API key</CardTitle>
-        </CardHeader>
-        <CardContent className="re-stack">
-          {settings.apiKey && (
-            <div className="re-field-note">
-              Current: <span className="re-kbd">{settings.apiKey}</span>
-            </div>
-          )}
-          <Label>
-            New API key
-            <Input
-              type="password"
-              placeholder="re_live_... (leave blank to keep existing)"
-              value={form.apiKey}
-              onChange={(event) => setForm({ ...form, apiKey: event.target.value })}
-            />
-          </Label>
-        </CardContent>
-      </Card>
+      <section className="re-metrics" aria-label="Configuration metrics">
+        <article className="re-metric">
+          <p className="re-metric-label">API key</p>
+          <p className="re-metric-value">{settings.apiKey ? "Configured" : "Missing"}</p>
+          <p className="re-metric-note">Required for all provider calls</p>
+        </article>
+        <article className="re-metric">
+          <p className="re-metric-label">Sender profile</p>
+          <p className="re-metric-value">{settings.fromAddress ? "Ready" : "Incomplete"}</p>
+          <p className="re-metric-note">From name + address defaults</p>
+        </article>
+        <article className="re-metric">
+          <p className="re-metric-label">Webhook</p>
+          <p className="re-metric-value">{settings.webhookRegistered ? "Active" : "Inactive"}</p>
+          <p className="re-metric-note">Event ingestion and delivery log sync</p>
+        </article>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Default sender</CardTitle>
-        </CardHeader>
-        <CardContent className="re-grid re-grid--2">
-          <Label>
-            From name
-            <Input
-              value={form.fromName}
-              onChange={(event) => setForm({ ...form, fromName: event.target.value })}
-            />
-          </Label>
-          <Label>
-            From address
-            <Input
-              type="email"
-              value={form.fromAddress}
-              onChange={(event) => setForm({ ...form, fromAddress: event.target.value })}
-            />
-          </Label>
-        </CardContent>
-      </Card>
+      <div className="re-subgrid">
+        <div className="re-stack">
+          <Card>
+            <CardHeader>
+              <CardTitle>API key</CardTitle>
+            </CardHeader>
+            <CardContent className="re-stack">
+              {settings.apiKey && (
+                <div className="re-field-note">
+                  Current: <span className="re-kbd">{settings.apiKey}</span>
+                </div>
+              )}
+              <Label>
+                New API key
+                <Input
+                  type="password"
+                  placeholder="re_live_... (leave blank to keep existing)"
+                  value={form.apiKey}
+                  onChange={(event) => setForm({ ...form, apiKey: event.target.value })}
+                />
+              </Label>
+            </CardContent>
+          </Card>
 
-      <div className="re-inline-actions">
-        <Button onClick={() => void handleSave()} disabled={saving}>
-          {saving ? "Saving..." : "Save settings"}
-        </Button>
-      </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Default sender</CardTitle>
+            </CardHeader>
+            <CardContent className="re-grid re-grid--2">
+              <Label>
+                From name
+                <Input
+                  value={form.fromName}
+                  onChange={(event) => setForm({ ...form, fromName: event.target.value })}
+                />
+              </Label>
+              <Label>
+                From address
+                <Input
+                  type="email"
+                  value={form.fromAddress}
+                  onChange={(event) => setForm({ ...form, fromAddress: event.target.value })}
+                />
+              </Label>
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Send test email</CardTitle>
-        </CardHeader>
-        <CardContent className="re-stack">
-          <Label>
-            Send to (optional)
-            <Input
-              type="email"
-              placeholder="Defaults to signed-in user, then From address"
-              value={testTo}
-              onChange={(event) => setTestTo(event.target.value)}
-            />
-          </Label>
           <div className="re-inline-actions">
-            <Button onClick={() => void handleTest()} disabled={!settings.apiKey}>
-              Send test email
+            <Button onClick={() => void handleSave()} disabled={saving}>
+              {saving ? "Saving..." : "Save settings"}
             </Button>
           </div>
-          {testResult?.success && (
-            <Notice tone="success">
-              Test email sent{testTo ? ` to ${testTo}` : ""}.
-            </Notice>
-          )}
-          {testResult?.error && (
-            <Notice tone="danger">{testResult.error}</Notice>
-          )}
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Webhook</CardTitle>
-        </CardHeader>
-        <CardContent className="re-stack">
-          <Notice tone={settings.webhookRegistered ? "success" : "danger"}>
-            {settings.webhookRegistered ? "Registered" : "Not registered"}
-          </Notice>
-          {settings.webhookId && (
-            <div className="re-field-note">
-              ID: <span className="re-kbd">{settings.webhookId}</span>
-            </div>
-          )}
-          {!settings.webhookRegistered && (
-            <div>
-              <Button onClick={() => void handleRegisterWebhook()} disabled={registering || !settings.apiKey}>
-                {registering ? "Registering..." : "Register webhook"}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <div className="re-stack">
+          <Card>
+            <CardHeader>
+              <CardTitle>Send test email</CardTitle>
+            </CardHeader>
+            <CardContent className="re-stack">
+              <Label>
+                Send to (optional)
+                <Input
+                  type="email"
+                  placeholder="Defaults to signed-in user, then From address"
+                  value={testTo}
+                  onChange={(event) => setTestTo(event.target.value)}
+                />
+              </Label>
+              <div className="re-inline-actions">
+                <Button onClick={() => void handleTest()} disabled={!settings.apiKey}>
+                  Send test email
+                </Button>
+              </div>
+              {testResult?.success && (
+                <Notice tone="success">
+                  Test email sent{testTo ? ` to ${testTo}` : ""}.
+                </Notice>
+              )}
+              {testResult?.error && (
+                <Notice tone="danger">{testResult.error}</Notice>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Webhook</CardTitle>
+            </CardHeader>
+            <CardContent className="re-stack">
+              <Notice tone={settings.webhookRegistered ? "success" : "danger"}>
+                {settings.webhookRegistered ? "Registered" : "Not registered"}
+              </Notice>
+              {settings.webhookId && (
+                <div className="re-field-note">
+                  ID: <span className="re-kbd">{settings.webhookId}</span>
+                </div>
+              )}
+              {!settings.webhookRegistered && (
+                <div>
+                  <Button onClick={() => void handleRegisterWebhook()} disabled={registering || !settings.apiKey}>
+                    {registering ? "Registering..." : "Register webhook"}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {error && <Notice tone="danger">{error}</Notice>}
     </div>

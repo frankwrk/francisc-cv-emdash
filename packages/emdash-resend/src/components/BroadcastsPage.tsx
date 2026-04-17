@@ -117,6 +117,16 @@ export function BroadcastsPage() {
     return "default";
   };
 
+  const draftCount = broadcasts.filter((broadcast) => broadcast.status.toLowerCase() === "draft").length;
+  const sentCount = broadcasts.filter((broadcast) => {
+    const status = broadcast.status.toLowerCase();
+    return status === "sent" || status === "completed";
+  }).length;
+  const queuedCount = broadcasts.filter((broadcast) => {
+    const status = broadcast.status.toLowerCase();
+    return status === "queued" || status === "processing";
+  }).length;
+
   return (
     <div className="re-page re-stack">
       <div className="re-page-header">
@@ -128,6 +138,29 @@ export function BroadcastsPage() {
           {composing ? "Close composer" : "New broadcast"}
         </Button>
       </div>
+
+      <section className="re-metrics" aria-label="Broadcast metrics">
+        <article className="re-metric">
+          <p className="re-metric-label">Total broadcasts</p>
+          <p className="re-metric-value">{broadcasts.length}</p>
+          <p className="re-metric-note">All campaigns created in workspace</p>
+        </article>
+        <article className="re-metric">
+          <p className="re-metric-label">Drafts</p>
+          <p className="re-metric-value">{draftCount}</p>
+          <p className="re-metric-note">Ready for review and send</p>
+        </article>
+        <article className="re-metric">
+          <p className="re-metric-label">Queued / processing</p>
+          <p className="re-metric-value">{queuedCount}</p>
+          <p className="re-metric-note">Currently in provider workflow</p>
+        </article>
+        <article className="re-metric">
+          <p className="re-metric-label">Sent</p>
+          <p className="re-metric-value">{sentCount}</p>
+          <p className="re-metric-note">Successfully completed sends</p>
+        </article>
+      </section>
 
       {composing && (
         <Card>
@@ -187,6 +220,9 @@ export function BroadcastsPage() {
       )}
 
       {error && <Notice tone="danger">{error}</Notice>}
+      {!audiences.length && !error && (
+        <Notice>You need at least one audience before composing a broadcast.</Notice>
+      )}
       {loading && <Notice>Loading broadcasts...</Notice>}
       {!loading && broadcasts.length === 0 && !error && (
         <Notice>No broadcasts yet. Create your first draft to get started.</Notice>

@@ -118,12 +118,33 @@ export function ContactsPage() {
     }
   };
 
+  const subscribedCount = contacts.filter((contact) => !contact.unsubscribed).length;
+  const unsubscribedCount = contacts.length - subscribedCount;
+
   return (
     <div className="re-page re-stack">
       <header>
         <h1 className="re-title">Contacts</h1>
         <p className="re-subtitle">Manage audience memberships and individual subscription states.</p>
       </header>
+
+      <section className="re-metrics" aria-label="Contacts metrics">
+        <article className="re-metric">
+          <p className="re-metric-label">Total contacts</p>
+          <p className="re-metric-value">{contacts.length}</p>
+          <p className="re-metric-note">Across selected audience</p>
+        </article>
+        <article className="re-metric">
+          <p className="re-metric-label">Subscribed</p>
+          <p className="re-metric-value">{subscribedCount}</p>
+          <p className="re-metric-note">Eligible for future sends</p>
+        </article>
+        <article className="re-metric">
+          <p className="re-metric-label">Unsubscribed</p>
+          <p className="re-metric-value">{unsubscribedCount}</p>
+          <p className="re-metric-note">Suppressed from campaigns</p>
+        </article>
+      </section>
 
       <div className="re-row">
         <Label>
@@ -181,6 +202,9 @@ export function ContactsPage() {
       </Card>
 
       {error && <Notice tone="danger">{error}</Notice>}
+      {!audiences.length && !error && (
+        <Notice>Create an audience in Resend first, then return to add contacts.</Notice>
+      )}
       {loading && <Notice>Loading contacts...</Notice>}
       {!loading && contacts.length === 0 && !error && (
         <Notice>No contacts in this audience yet.</Notice>
