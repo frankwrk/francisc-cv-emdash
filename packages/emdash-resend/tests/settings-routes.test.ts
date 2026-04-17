@@ -3,6 +3,7 @@ import {
   handleGetSettings,
   handleSaveSettings,
   handleGetWebhookStatus,
+  handleRegisterWebhook,
 } from "../src/handlers/settings.js";
 import { makeRouteMockCtx } from "./helpers.js";
 
@@ -85,5 +86,45 @@ describe("handleGetWebhookStatus", () => {
     const result = await handleGetWebhookStatus(ctx as any);
     expect(result.registered).toBe(true);
     expect(result.webhookId).toBe("wh_123");
+  });
+});
+
+describe("handleRegisterWebhook", () => {
+  it("replaces an existing webhook before registering a new one", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: "wh_new", signing_secret: "whsec_new" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+    const ctx = makeRouteMockCtx(
+      {},
+      {
+        method: "POST",
+        url: "https://mysite.com/_emdash/api/plugins/emdash-resend/settings/webhook-register",
+        kv: {
+          "settings:apiKey": "re_test",
+          "settings:webhookId": "wh_existing",
+        },
+        fetchImpl: fetchMock,
+      }
+    );
+
+    const result = await handleRegisterWebhook(ctx as any);
+
+    expect(result).toEqual({ success: true, webhookId: "wh_new" });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.resend.com/webhooks/wh_existing",
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.resend.com/webhooks",
+      expect.objectContaining({ method: "POST" })
+    );
   });
 });

@@ -19,11 +19,11 @@ interface DeliverEvent {
 }
 
 export async function handleEmailDeliver(event: DeliverEvent, ctx: any): Promise<void> {
-  const apiKey = await ctx.kv.get<string>("settings:apiKey");
+  const apiKey = await ctx.kv.get("settings:apiKey");
   if (!apiKey) throw new Error("Resend plugin: API key not configured. Add it in the Resend plugin settings.");
 
-  const fromAddress = await ctx.kv.get<string>("settings:fromAddress");
-  const fromName = await ctx.kv.get<string>("settings:fromName");
+  const fromAddress = await ctx.kv.get("settings:fromAddress");
+  const fromName = await ctx.kv.get("settings:fromName");
 
   let from = event.message.from;
   if (!from) {
@@ -51,11 +51,19 @@ export async function handleEmailDeliver(event: DeliverEvent, ctx: any): Promise
   const result = await client.sendEmail(params as any);
 
   const to = Array.isArray(event.message.to) ? event.message.to.join(", ") : event.message.to;
-  await ctx.storage.deliveries.put(result.id, {
-    resendId: result.id,
-    to,
-    subject: event.message.subject,
-    status: "sent",
-    createdAt: new Date().toISOString(),
-  });
+  try {
+    await ctx.storage.deliveries.put(result.id, {
+      resendId: result.id,
+      to,
+      subject: event.message.subject,
+      status: "sent",
+      createdAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    // The provider accepted the message. Failing here would cause retries and duplicate sends.
+    ctx.log?.warn?.("Resend plugin: failed to persist delivery record after send", {
+      resendId: result.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

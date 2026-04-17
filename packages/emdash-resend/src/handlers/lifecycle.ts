@@ -11,7 +11,7 @@ const WEBHOOK_EVENTS = [
 ];
 
 async function registerWebhook(ctx: any, apiKey: string): Promise<void> {
-  const siteUrl = await ctx.kv.get<string>("settings:siteUrl");
+  const siteUrl = await ctx.kv.get("settings:siteUrl");
   if (!siteUrl) return;
 
   const webhookUrl = `${siteUrl}/_emdash/api/plugins/emdash-resend/webhook`;
@@ -23,26 +23,26 @@ async function registerWebhook(ctx: any, apiKey: string): Promise<void> {
 }
 
 export async function handleInstall(_event: unknown, ctx: any): Promise<void> {
-  const apiKey = await ctx.kv.get<string>("settings:apiKey");
+  const apiKey = await ctx.kv.get("settings:apiKey");
   if (!apiKey) return;
   await registerWebhook(ctx, apiKey);
 }
 
 export async function handleActivate(_event: unknown, ctx: any): Promise<void> {
-  const webhookId = await ctx.kv.get<string>("settings:webhookId");
+  const webhookId = await ctx.kv.get("settings:webhookId");
   if (webhookId) return;
 
-  const apiKey = await ctx.kv.get<string>("settings:apiKey");
+  const apiKey = await ctx.kv.get("settings:apiKey");
   if (!apiKey) return;
 
   await registerWebhook(ctx, apiKey);
 }
 
 export async function handleDeactivate(_event: unknown, ctx: any): Promise<void> {
-  const webhookId = await ctx.kv.get<string>("settings:webhookId");
+  const webhookId = await ctx.kv.get("settings:webhookId");
   if (!webhookId) return;
 
-  const apiKey = await ctx.kv.get<string>("settings:apiKey");
+  const apiKey = await ctx.kv.get("settings:apiKey");
   if (!apiKey) return;
 
   const client = new ResendClient(apiKey, ctx.http.fetch.bind(ctx.http));

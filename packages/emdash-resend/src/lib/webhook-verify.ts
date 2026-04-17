@@ -16,7 +16,9 @@ export async function verifySvixSignature(
   if (!svixId || !svixTimestamp || !svixSignature) return false;
 
   const timestamp = parseInt(svixTimestamp, 10);
-  if (isNaN(timestamp) || Date.now() - timestamp * 1000 > FIVE_MINUTES_MS) return false;
+  if (isNaN(timestamp)) return false;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSeconds - timestamp) > FIVE_MINUTES_MS / 1000) return false;
 
   const rawSecret = secret.replace(/^whsec_/, "");
   let secretBytes: Uint8Array;
@@ -26,9 +28,13 @@ export async function verifySvixSignature(
     return false;
   }
 
+  // Normalize to an ArrayBuffer-backed view that satisfies WebCrypto BufferSource typing.
+  const keyBytes = new Uint8Array(secretBytes.length);
+  keyBytes.set(secretBytes);
+
   const key = await crypto.subtle.importKey(
     "raw",
-    secretBytes,
+    keyBytes,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]

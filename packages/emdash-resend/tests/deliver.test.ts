@@ -82,4 +82,23 @@ describe("handleEmailDeliver", () => {
     const ctx = makeMockCtx({ kv: { "settings:apiKey": "re_test_key" } });
     await expect(handleEmailDeliver(makeEvent(), ctx as any)).rejects.toThrow("from address");
   });
+
+  it("does not throw when delivery persistence fails after provider acceptance", async () => {
+    const ctx = makeMockCtx({
+      kv: {
+        "settings:apiKey": "re_test_key",
+        "settings:fromAddress": "noreply@example.com",
+      },
+      fetchImpl: vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: "email_after_send" }), { status: 200, headers: { "Content-Type": "application/json" } })
+      ),
+    });
+    ctx.storage.deliveries.put = vi.fn().mockRejectedValue(new Error("storage unavailable"));
+
+    await expect(handleEmailDeliver(makeEvent(), ctx as any)).resolves.toBeUndefined();
+    expect(ctx.log.warn).toHaveBeenCalledWith(
+      "Resend plugin: failed to persist delivery record after send",
+      expect.objectContaining({ resendId: "email_after_send" })
+    );
+  });
 });

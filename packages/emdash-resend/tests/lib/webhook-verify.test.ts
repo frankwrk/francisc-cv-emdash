@@ -47,6 +47,17 @@ describe("verifySvixSignature", () => {
     expect(result).toBe(false);
   });
 
+  it("returns false if timestamp is more than 5 minutes in the future", async () => {
+    const futureTimestamp = Math.floor((Date.now() + 6 * 60 * 1000) / 1000).toString();
+    const sig = await sign(SVIX_SECRET, svixId, futureTimestamp, body);
+    const result = await verifySvixSignature(body, {
+      "svix-id": svixId,
+      "svix-timestamp": futureTimestamp,
+      "svix-signature": sig,
+    }, SVIX_SECRET);
+    expect(result).toBe(false);
+  });
+
   it("accepts any valid sig from space-separated list", async () => {
     const sig1 = await sign(SVIX_SECRET, svixId, nowSeconds, body);
     const result = await verifySvixSignature(body, {
