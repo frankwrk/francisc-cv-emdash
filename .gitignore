@@ -19,7 +19,12 @@ data.db-*
 .wrangler/
 
 # Local tool state
-.claude/settings.local.json
+.agents/
+.claude/
+.impeccable.md
+AGENTS.md
+CLAUDE.md
+docs/
 
 # Environment and local secrets
 .env

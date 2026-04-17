@@ -57,6 +57,7 @@ This repository should not track local runtime state, generated artifacts, or se
 - Ignored by default:
   - dependencies/build: `node_modules/`, `dist/`, `coverage/`, `*.tsbuildinfo`
   - local runtime data: `.astro/`, `.wrangler/`, `uploads/`, `data.db*`
+  - local agent/tooling files: `.agents/`, `.claude/`, `.impeccable.md`, `AGENTS.md`, `CLAUDE.md`, `docs/`
   - secrets/local env: `.env*`, `.dev.vars*`, `dev.vars` (except `.env.example`)
   - noise: `*.log`, `.DS_Store`
 - If files were tracked before these rules, untrack once:
