@@ -1,8 +1,19 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api } from "./api.js";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Notice, Select, Table } from "./ui.js";
 
-interface Audience { id: string; name: string }
-interface Contact { id: string; email: string; first_name?: string; last_name?: string; unsubscribed: boolean }
+interface Audience {
+  id: string;
+  name: string;
+}
+
+interface Contact {
+  id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  unsubscribed: boolean;
+}
 
 export function ContactsPage() {
   const [audiences, setAudiences] = useState<Audience[]>([]);
@@ -10,24 +21,60 @@ export function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [addForm, setAddForm] = useState({ email: "", firstName: "", lastName: "" });
   const [adding, setAdding] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get("audiences").then((r: any) => {
-      setAudiences(r.data ?? []);
-      if (r.data?.length > 0) setSelectedAudienceId(r.data[0].id);
-    });
+    const loadAudiences = async () => {
+      setError(null);
+      try {
+        const result = await api.get("audiences") as { data?: Audience[] };
+        const nextAudiences = result.data ?? [];
+        setAudiences(nextAudiences);
+        if (nextAudiences.length > 0) {
+          setSelectedAudienceId(nextAudiences[0].id);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+        setLoading(false);
+      }
+    };
+
+    void loadAudiences();
   }, []);
 
   useEffect(() => {
-    if (!selectedAudienceId) return;
-    api.get(`audiences/contacts?audienceId=${selectedAudienceId}`).then((r: any) => {
-      setContacts(r.data ?? []);
-    });
+    const loadContacts = async () => {
+      if (!selectedAudienceId) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await api.get(`audiences/contacts?audienceId=${selectedAudienceId}`) as { data?: Contact[] };
+        setContacts(result.data ?? []);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadContacts();
   }, [selectedAudienceId]);
+
+  const refreshContacts = async () => {
+    if (!selectedAudienceId) return;
+    const result = await api.get(`audiences/contacts?audienceId=${selectedAudienceId}`) as { data?: Contact[] };
+    setContacts(result.data ?? []);
+  };
 
   const handleAdd = async () => {
     if (!addForm.email || !selectedAudienceId) return;
     setAdding(true);
+    setError(null);
     try {
       await api.post("audiences/contacts/add", {
         audienceId: selectedAudienceId,
@@ -36,79 +83,153 @@ export function ContactsPage() {
         lastName: addForm.lastName || undefined,
       });
       setAddForm({ email: "", firstName: "", lastName: "" });
-      const r = await api.get(`audiences/contacts?audienceId=${selectedAudienceId}`) as any;
-      setContacts(r.data ?? []);
+      await refreshContacts();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     } finally {
       setAdding(false);
     }
   };
 
   const handleUnsubscribe = async (contactId: string) => {
-    await api.post("audiences/contacts/unsubscribe", { audienceId: selectedAudienceId, contactId });
-    setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, unsubscribed: true } : c));
+    setError(null);
+    try {
+      await api.post("audiences/contacts/unsubscribe", { audienceId: selectedAudienceId, contactId });
+      setContacts((prev) => prev.map((contact) => (
+        contact.id === contactId
+          ? { ...contact, unsubscribed: true }
+          : contact
+      )));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    }
   };
 
   const handleDelete = async (contactId: string) => {
-    await api.post("audiences/contacts/delete", { audienceId: selectedAudienceId, contactId });
-    setContacts((prev) => prev.filter((c) => c.id !== contactId));
+    setError(null);
+    try {
+      await api.post("audiences/contacts/delete", { audienceId: selectedAudienceId, contactId });
+      setContacts((prev) => prev.filter((contact) => contact.id !== contactId));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    }
   };
 
   return (
-    <div style={{ padding: "1.5rem" }}>
-      <h1>Contacts</h1>
+    <div className="re-page re-stack">
+      <header>
+        <h1 className="re-title">Contacts</h1>
+        <p className="re-subtitle">Manage audience memberships and individual subscription states.</p>
+      </header>
 
-      <div style={{ marginBottom: "1.5rem" }}>
-        <label>
-          Audience:{" "}
-          <select value={selectedAudienceId} onChange={(e) => setSelectedAudienceId(e.target.value)}>
-            {audiences.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-        </label>
+      <div className="re-row">
+        <Label>
+          Audience
+          <Select value={selectedAudienceId} onChange={(event) => setSelectedAudienceId(event.target.value)}>
+            {audiences.map((audience) => (
+              <option key={audience.id} value={audience.id}>
+                {audience.name}
+              </option>
+            ))}
+          </Select>
+        </Label>
       </div>
 
-      <div style={{ marginBottom: "2rem", padding: "1rem", border: "1px solid #e5e7eb", borderRadius: 6 }}>
-        <h3 style={{ marginTop: 0 }}>Add contact</h3>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <input placeholder="Email *" type="email" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} />
-          <input placeholder="First name" value={addForm.firstName} onChange={(e) => setAddForm({ ...addForm, firstName: e.target.value })} />
-          <input placeholder="Last name" value={addForm.lastName} onChange={(e) => setAddForm({ ...addForm, lastName: e.target.value })} />
-          <button onClick={handleAdd} disabled={adding || !addForm.email}>
-            {adding ? "Adding…" : "Add"}
-          </button>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Add contact</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="re-grid re-grid--4">
+            <Label>
+              Email *
+              <Input
+                type="email"
+                placeholder="person@example.com"
+                value={addForm.email}
+                onChange={(event) => setAddForm({ ...addForm, email: event.target.value })}
+              />
+            </Label>
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <Label>
+              First name
+              <Input
+                value={addForm.firstName}
+                onChange={(event) => setAddForm({ ...addForm, firstName: event.target.value })}
+              />
+            </Label>
+
+            <Label>
+              Last name
+              <Input
+                value={addForm.lastName}
+                onChange={(event) => setAddForm({ ...addForm, lastName: event.target.value })}
+              />
+            </Label>
+
+            <Label>
+              Add
+              <Button onClick={handleAdd} disabled={adding || !addForm.email || !selectedAudienceId}>
+                {adding ? "Adding..." : "Add contact"}
+              </Button>
+            </Label>
+          </div>
+        </CardContent>
+      </Card>
+
+      {error && <Notice tone="danger">{error}</Notice>}
+      {loading && <Notice>Loading contacts...</Notice>}
+      {!loading && contacts.length === 0 && !error && (
+        <Notice>No contacts in this audience yet.</Notice>
+      )}
+
+      <Table>
         <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-            <th style={{ padding: "0.5rem" }}>Email</th>
-            <th style={{ padding: "0.5rem" }}>Name</th>
-            <th style={{ padding: "0.5rem" }}>Status</th>
-            <th style={{ padding: "0.5rem" }}>Actions</th>
+          <tr>
+            <th>Email</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {contacts.map((c) => (
-            <tr key={c.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-              <td style={{ padding: "0.5rem" }}>{c.email}</td>
-              <td style={{ padding: "0.5rem" }}>{[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}</td>
-              <td style={{ padding: "0.5rem", color: c.unsubscribed ? "#dc2626" : "#16a34a" }}>
-                {c.unsubscribed ? "Unsubscribed" : "Subscribed"}
+          {contacts.map((contact) => (
+            <tr key={contact.id}>
+              <td className="re-kbd">{contact.email}</td>
+              <td>{[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}</td>
+              <td>
+                <Badge variant={contact.unsubscribed ? "destructive" : "success"}>
+                  {contact.unsubscribed ? "Unsubscribed" : "Subscribed"}
+                </Badge>
               </td>
-              <td style={{ padding: "0.5rem", display: "flex", gap: "0.5rem" }}>
-                {!c.unsubscribed && (
-                  <button onClick={() => handleUnsubscribe(c.id)} style={{ fontSize: "0.8rem" }}>
-                    Unsubscribe
-                  </button>
-                )}
-                <button onClick={() => handleDelete(c.id)} style={{ fontSize: "0.8rem", color: "#dc2626" }}>
-                  Delete
-                </button>
+              <td>
+                <div className="re-inline-actions">
+                  {!contact.unsubscribed && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void handleUnsubscribe(contact.id)}
+                    >
+                      Unsubscribe
+                    </Button>
+                  )}
+
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => void handleDelete(contact.id)}
+                  >
+                    Delete
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
+      </Table>
     </div>
   );
 }

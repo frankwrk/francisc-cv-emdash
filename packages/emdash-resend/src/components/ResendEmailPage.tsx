@@ -3,6 +3,8 @@ import { SettingsPage } from "./SettingsPage.js";
 import { DeliveryLogPage } from "./DeliveryLogPage.js";
 import { ContactsPage } from "./ContactsPage.js";
 import { BroadcastsPage } from "./BroadcastsPage.js";
+import { Button } from "./ui.js";
+import { ResendAdminStyles } from "./resend-admin-styles.js";
 
 type TabKey = "delivery-log" | "contacts" | "broadcasts" | "settings";
 
@@ -37,42 +39,26 @@ export function ResendEmailPage() {
   }, [activeTab]);
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          gap: "0.5rem",
-          alignItems: "center",
-          padding: "1rem 1.5rem 0.5rem",
-          borderBottom: "1px solid #e5e7eb",
-          position: "sticky",
-          top: 0,
-          background: "var(--emdash-surface, #fff)",
-          zIndex: 1,
-        }}
-      >
-        {TABS.map((tab) => {
-          const active = tab.key === activeTab;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              style={{
-                border: "1px solid #d1d5db",
-                background: active ? "#111827" : "#fff",
-                color: active ? "#fff" : "#111827",
-                fontWeight: 600,
-                fontSize: "0.875rem",
-                borderRadius: 8,
-                padding: "0.45rem 0.75rem",
-                cursor: "pointer",
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+    <div className="re-shell">
+      <ResendAdminStyles />
+
+      <div className="re-topbar">
+        <div className="re-tabs">
+          {TABS.map((tab) => {
+            const active = tab.key === activeTab;
+            return (
+              <Button
+                key={tab.key}
+                size="sm"
+                variant={active ? "default" : "outline"}
+                onClick={() => setActiveTab(tab.key)}
+                aria-current={active ? "page" : undefined}
+              >
+                {tab.label}
+              </Button>
+            );
+          })}
+        </div>
       </div>
 
       {activeTab === "delivery-log" && <DeliveryLogPage />}

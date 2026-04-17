@@ -1,14 +1,41 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api } from "./api.js";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+  Notice,
+  Select,
+  Table,
+  Textarea,
+} from "./ui.js";
 
-interface Broadcast { id: string; name: string; audience_id: string; status: string; created_at: string }
-interface Audience { id: string; name: string }
+interface Broadcast {
+  id: string;
+  name: string;
+  audience_id: string;
+  status: string;
+  created_at: string;
+}
+
+interface Audience {
+  id: string;
+  name: string;
+}
 
 export function BroadcastsPage() {
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [audiences, setAudiences] = useState<Audience[]>([]);
   const [composing, setComposing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     audienceId: "",
@@ -17,118 +44,188 @@ export function BroadcastsPage() {
     html: "",
   });
 
+  const fetchBroadcasts = async () => {
+    const response = await api.get("broadcasts") as { data?: Broadcast[] };
+    setBroadcasts(response.data ?? []);
+  };
+
   useEffect(() => {
-    Promise.all([
-      api.get("broadcasts"),
-      api.get("audiences"),
-    ]).then(([bc, aud]: any[]) => {
-      setBroadcasts(bc.data ?? []);
-      const audList = aud.data ?? [];
-      setAudiences(audList);
-      if (audList.length > 0) setForm((f) => ({ ...f, audienceId: audList[0].id }));
-    });
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [broadcastResponse, audienceResponse] = await Promise.all([
+          api.get("broadcasts") as Promise<{ data?: Broadcast[] }>,
+          api.get("audiences") as Promise<{ data?: Audience[] }>,
+        ]);
+
+        const nextAudiences = audienceResponse.data ?? [];
+        setBroadcasts(broadcastResponse.data ?? []);
+        setAudiences(nextAudiences);
+
+        if (nextAudiences.length > 0) {
+          setForm((prev) => ({ ...prev, audienceId: nextAudiences[0].id }));
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void load();
   }, []);
 
   const handleCreate = async () => {
     if (!form.audienceId || !form.from || !form.subject) return;
-    await api.post("broadcasts/create", form);
-    const updated = await api.get("broadcasts") as any;
-    setBroadcasts(updated.data ?? []);
-    setComposing(false);
-    setForm((f) => ({ ...f, name: "", subject: "", html: "" }));
+    setSaving(true);
+    setError(null);
+    try {
+      await api.post("broadcasts/create", form);
+      await fetchBroadcasts();
+      setComposing(false);
+      setForm((prev) => ({ ...prev, name: "", subject: "", html: "" }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSend = async (broadcastId: string) => {
     setSending(broadcastId);
+    setError(null);
     try {
       await api.post("broadcasts/send", { broadcastId });
-      const updated = await api.get("broadcasts") as any;
-      setBroadcasts(updated.data ?? []);
+      await fetchBroadcasts();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     } finally {
       setSending(null);
     }
   };
 
+  const getStatusVariant = (status: string): "default" | "success" | "warning" | "destructive" | "muted" => {
+    const normalized = status.toLowerCase();
+    if (normalized === "sent" || normalized === "completed") return "success";
+    if (normalized === "processing" || normalized === "queued") return "warning";
+    if (normalized === "canceled" || normalized === "failed") return "destructive";
+    if (normalized === "draft") return "muted";
+    return "default";
+  };
+
   return (
-    <div style={{ padding: "1.5rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-        <h1 style={{ margin: 0 }}>Broadcasts</h1>
-        <button onClick={() => setComposing(true)}>New broadcast</button>
+    <div className="re-page re-stack">
+      <div className="re-page-header">
+        <header>
+          <h1 className="re-title">Broadcasts</h1>
+          <p className="re-subtitle">Compose, draft, and send campaigns to selected audiences.</p>
+        </header>
+        <Button onClick={() => setComposing((prev) => !prev)}>
+          {composing ? "Close composer" : "New broadcast"}
+        </Button>
       </div>
 
       {composing && (
-        <div style={{ marginBottom: "2rem", padding: "1.5rem", border: "1px solid #e5e7eb", borderRadius: 8 }}>
-          <h2 style={{ marginTop: 0 }}>Compose broadcast</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>Compose broadcast</CardTitle>
+          </CardHeader>
+          <CardContent className="re-stack">
+            <div className="re-grid re-grid--2">
+              <Label>
+                Name (optional)
+                <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+              </Label>
+              <Label>
+                Audience *
+                <Select value={form.audienceId} onChange={(event) => setForm({ ...form, audienceId: event.target.value })}>
+                  {audiences.map((audience) => (
+                    <option key={audience.id} value={audience.id}>
+                      {audience.name}
+                    </option>
+                  ))}
+                </Select>
+              </Label>
+              <Label>
+                From *
+                <Input
+                  type="email"
+                  placeholder="newsletter@example.com"
+                  value={form.from}
+                  onChange={(event) => setForm({ ...form, from: event.target.value })}
+                />
+              </Label>
+              <Label>
+                Subject *
+                <Input
+                  value={form.subject}
+                  onChange={(event) => setForm({ ...form, subject: event.target.value })}
+                />
+              </Label>
+            </div>
 
-          <label style={{ display: "block", marginBottom: "0.75rem" }}>
-            Name (optional)
-            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={{ display: "block", width: "100%" }} />
-          </label>
+            <Label>
+              HTML content
+              <Textarea
+                value={form.html}
+                onChange={(event) => setForm({ ...form, html: event.target.value })}
+              />
+            </Label>
 
-          <label style={{ display: "block", marginBottom: "0.75rem" }}>
-            Audience *
-            <select value={form.audienceId} onChange={(e) => setForm({ ...form, audienceId: e.target.value })} style={{ display: "block" }}>
-              {audiences.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-          </label>
-
-          <label style={{ display: "block", marginBottom: "0.75rem" }}>
-            From *
-            <input type="email" placeholder="newsletter@example.com" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} style={{ display: "block", width: "100%" }} />
-          </label>
-
-          <label style={{ display: "block", marginBottom: "0.75rem" }}>
-            Subject *
-            <input type="text" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} style={{ display: "block", width: "100%" }} />
-          </label>
-
-          <label style={{ display: "block", marginBottom: "1rem" }}>
-            HTML content
-            <textarea
-              value={form.html}
-              onChange={(e) => setForm({ ...form, html: e.target.value })}
-              rows={10}
-              style={{ display: "block", width: "100%", fontFamily: "monospace", fontSize: "0.85rem" }}
-            />
-          </label>
-
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button onClick={handleCreate}>Save as draft</button>
-            <button onClick={() => setComposing(false)}>Cancel</button>
-          </div>
-        </div>
+            <div className="re-inline-actions">
+              <Button onClick={() => void handleCreate()} disabled={saving || !form.audienceId || !form.from || !form.subject}>
+                {saving ? "Saving..." : "Save as draft"}
+              </Button>
+              <Button variant="ghost" onClick={() => setComposing(false)}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      {error && <Notice tone="danger">{error}</Notice>}
+      {loading && <Notice>Loading broadcasts...</Notice>}
+      {!loading && broadcasts.length === 0 && !error && (
+        <Notice>No broadcasts yet. Create your first draft to get started.</Notice>
+      )}
+
+      <Table>
         <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-            <th style={{ padding: "0.5rem" }}>Name</th>
-            <th style={{ padding: "0.5rem" }}>Status</th>
-            <th style={{ padding: "0.5rem" }}>Created</th>
-            <th style={{ padding: "0.5rem" }}>Actions</th>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {broadcasts.map((b) => (
-            <tr key={b.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-              <td style={{ padding: "0.5rem" }}>{b.name || <span style={{ color: "#888" }}>Untitled</span>}</td>
-              <td style={{ padding: "0.5rem" }}>{b.status}</td>
-              <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>{new Date(b.created_at).toLocaleString()}</td>
-              <td style={{ padding: "0.5rem" }}>
-                {b.status === "draft" && (
-                  <button
-                    onClick={() => handleSend(b.id)}
-                    disabled={sending === b.id}
-                    style={{ fontSize: "0.85rem" }}
+          {broadcasts.map((broadcast) => (
+            <tr key={broadcast.id}>
+              <td>{broadcast.name || <span className="re-mut">Untitled</span>}</td>
+              <td>
+                <Badge variant={getStatusVariant(broadcast.status)}>
+                  {broadcast.status}
+                </Badge>
+              </td>
+              <td className="re-kbd">{new Date(broadcast.created_at).toLocaleString()}</td>
+              <td>
+                {broadcast.status === "draft" ? (
+                  <Button
+                    size="sm"
+                    onClick={() => void handleSend(broadcast.id)}
+                    disabled={sending === broadcast.id}
                   >
-                    {sending === b.id ? "Sending…" : "Send now"}
-                  </button>
-                )}
+                    {sending === broadcast.id ? "Sending..." : "Send now"}
+                  </Button>
+                ) : "—"}
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
+      </Table>
     </div>
   );
 }

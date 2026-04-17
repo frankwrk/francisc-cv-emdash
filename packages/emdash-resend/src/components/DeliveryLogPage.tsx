@@ -1,5 +1,6 @@
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api } from "./api.js";
+import { Badge, Button, Notice, Table } from "./ui.js";
 
 type DeliveryStatus = "sent" | "delivered" | "bounced" | "complained" | "delayed";
 
@@ -11,17 +12,7 @@ interface Delivery {
   status: DeliveryStatus;
   createdAt: string;
   openedAt?: string;
-  clickedAt?: string;
-  bouncedAt?: string;
 }
-
-const STATUS_COLORS: Record<DeliveryStatus, string> = {
-  sent: "#888",
-  delivered: "#16a34a",
-  bounced: "#dc2626",
-  complained: "#d97706",
-  delayed: "#64748b",
-};
 
 const STATUS_FILTERS: Array<{ value: string; label: string }> = [
   { value: "", label: "All" },
@@ -31,105 +22,139 @@ const STATUS_FILTERS: Array<{ value: string; label: string }> = [
   { value: "delayed", label: "Delayed" },
 ];
 
+function getBadgeVariant(value: DeliveryStatus): "default" | "success" | "warning" | "destructive" | "muted" {
+  if (value === "delivered") return "success";
+  if (value === "bounced") return "destructive";
+  if (value === "complained") return "warning";
+  if (value === "delayed") return "muted";
+  return "default";
+}
+
 export function DeliveryLogPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [status, setStatus] = useState("");
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const load = async (filter: string, cur?: string) => {
     setLoading(true);
+    setError(null);
     const params = new URLSearchParams({ limit: "50" });
     if (filter) params.set("status", filter);
     if (cur) params.set("cursor", cur);
 
-    const result = await api.get(`deliveries?${params}`) as {
-      items: Delivery[];
-      cursor?: string;
-      hasMore: boolean;
-    };
+    try {
+      const result = await api.get(`deliveries?${params}`) as {
+        items: Delivery[];
+        cursor?: string;
+        hasMore: boolean;
+      };
 
-    setDeliveries((prev) => cur ? [...prev, ...result.items] : result.items);
-    setCursor(result.cursor);
-    setHasMore(result.hasMore);
-    setLoading(false);
+      setDeliveries((prev) => cur ? [...prev, ...result.items] : result.items);
+      setCursor(result.cursor);
+      setHasMore(result.hasMore);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(status); }, [status]);
+  useEffect(() => {
+    void load(status);
+  }, [status]);
 
-  const handleFilterChange = (f: string) => {
-    setStatus(f);
+  const handleFilterChange = (value: string) => {
+    setStatus(value);
+    setSelectedId(null);
     setDeliveries([]);
     setCursor(undefined);
   };
 
   return (
-    <div style={{ padding: "1.5rem" }}>
-      <h1>Delivery Log</h1>
+    <div className="re-page re-stack">
+      <header>
+        <h1 className="re-title">Delivery Log</h1>
+        <p className="re-subtitle">Inspect recipient-level delivery activity, opens, and provider event details.</p>
+      </header>
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
-        {STATUS_FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => handleFilterChange(f.value)}
-            style={{ fontWeight: status === f.value ? "bold" : "normal" }}
+      <div className="re-inline-actions">
+        {STATUS_FILTERS.map((filter) => (
+          <Button
+            key={filter.value}
+            size="sm"
+            onClick={() => handleFilterChange(filter.value)}
+            variant={status === filter.value ? "default" : "ghost"}
           >
-            {f.label}
-          </button>
+            {filter.label}
+          </Button>
         ))}
       </div>
 
-      {loading && <p>Loading…</p>}
+      {error && <Notice tone="danger">{error}</Notice>}
+      {loading && <Notice>Loading deliveries...</Notice>}
+      {!loading && deliveries.length === 0 && !error && (
+        <Notice>No events yet. Once webhooks arrive, deliveries will appear here.</Notice>
+      )}
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <Table>
         <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-            <th style={{ padding: "0.5rem" }}>Recipient</th>
-            <th style={{ padding: "0.5rem" }}>Subject</th>
-            <th style={{ padding: "0.5rem" }}>Status</th>
-            <th style={{ padding: "0.5rem" }}>Sent</th>
-            <th style={{ padding: "0.5rem" }}>Opened</th>
+          <tr>
+            <th>Recipient</th>
+            <th>Subject</th>
+            <th>Status</th>
+            <th>Sent</th>
+            <th>Opened</th>
           </tr>
         </thead>
         <tbody>
-          {deliveries.map((d) => (
-            <Fragment key={d.id}>
-              <tr
-                onClick={() => setSelectedId(selectedId === d.id ? null : d.id)}
-                style={{ cursor: "pointer", borderBottom: "1px solid #f3f4f6" }}
-              >
-                <td style={{ padding: "0.5rem", fontFamily: "monospace", fontSize: "0.85rem" }}>{d.to}</td>
-                <td style={{ padding: "0.5rem" }}>{d.subject}</td>
-                <td style={{ padding: "0.5rem" }}>
-                  <span style={{ color: STATUS_COLORS[d.status] ?? "#888", fontWeight: 500 }}>
-                    {d.status}
-                  </span>
+          {deliveries.map((delivery) => (
+            <Fragment key={delivery.id}>
+              <tr>
+                <td>
+                  <button
+                    className="re-table-row-button"
+                    onClick={() => setSelectedId(selectedId === delivery.id ? null : delivery.id)}
+                    aria-expanded={selectedId === delivery.id}
+                    type="button"
+                  >
+                    <span className="re-kbd">{delivery.to}</span>
+                  </button>
                 </td>
-                <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>
-                  {new Date(d.createdAt).toLocaleString()}
+                <td>{delivery.subject}</td>
+                <td>
+                  <Badge variant={getBadgeVariant(delivery.status)}>
+                    {delivery.status}
+                  </Badge>
                 </td>
-                <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>
-                  {d.openedAt ? new Date(d.openedAt).toLocaleString() : "—"}
-                </td>
+                <td className="re-kbd">{new Date(delivery.createdAt).toLocaleString()}</td>
+                <td className="re-kbd">{delivery.openedAt ? new Date(delivery.openedAt).toLocaleString() : "—"}</td>
               </tr>
-              {selectedId === d.id && (
-                <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                  <td colSpan={5} style={{ padding: "0.5rem", background: "#f9fafb", fontSize: "0.8rem", fontFamily: "monospace" }}>
-                    Resend ID: {d.resendId}
+              {selectedId === delivery.id && (
+                <tr>
+                  <td colSpan={5}>
+                    <div className="re-notice">
+                      <strong>Resend ID:</strong>{" "}
+                      <span className="re-kbd">{delivery.resendId}</span>
+                    </div>
                   </td>
                 </tr>
               )}
             </Fragment>
           ))}
         </tbody>
-      </table>
+      </Table>
 
       {hasMore && (
-        <button onClick={() => load(status, cursor)} style={{ marginTop: "1rem" }}>
-          Load more
-        </button>
+        <div>
+          <Button variant="outline" onClick={() => void load(status, cursor)}>
+            Load more
+          </Button>
+        </div>
       )}
     </div>
   );

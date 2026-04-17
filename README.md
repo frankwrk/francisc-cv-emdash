@@ -61,6 +61,13 @@ pnpm dev
 - The Resend plugin is exposed as a single Plugins entry: `Resend Email`.
 - That page contains top-left tabs for `Delivery Log`, `Contacts`, `Broadcasts`, and `Settings`.
 - The active tab is mirrored to `?tab=` in the URL for refresh-safe navigation.
+- The tab shell and page controls are now built from plugin-local shadcn-style primitives (`Button`, `Card`, `Input`, `Select`, `Textarea`, `Badge`, `Table`, `Notice`) in `packages/emdash-resend/src/components/ui.tsx`.
+- Styling is scoped in `packages/emdash-resend/src/components/resend-admin-styles.tsx` so plugin UI updates do not leak into the site theme.
+- Page details retained from the original workflow:
+  - `Delivery Log`: status filters, expandable Resend ID row, open timestamp column.
+  - `Contacts`: audience selector, inline add-contact form, unsubscribe/delete actions.
+  - `Broadcasts`: compose panel, draft table, per-row send action.
+  - `Settings`: masked API key view, sender defaults, test email, webhook registration state.
 
 ## Git Hygiene
 
