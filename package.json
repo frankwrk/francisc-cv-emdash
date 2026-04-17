@@ -18,6 +18,7 @@
 		"@emdash-cms/cloudflare": "^0.4.0",
 		"@emdash-cms/plugin-forms": "^0.1.1",
 		"@emdash-cms/plugin-webhook-notifier": "^0.1.2",
+		"@frankwrk/emdash-resend": "workspace:*",
 		"astro": "^6.1.7",
 		"emdash": "^0.4.0",
 		"react": "19.2.4",
