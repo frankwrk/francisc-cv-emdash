@@ -84,6 +84,7 @@ export function SettingsPage() {
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [switchingProvider, setSwitchingProvider] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [refreshingWorkerStatus, setRefreshingWorkerStatus] = useState(false);
@@ -114,8 +115,9 @@ export function SettingsPage() {
     sendEmailBindingName: "EMAIL_SENDER",
   });
 
-  const loadSettings = async () => {
-    setLoading(true);
+  const loadSettings = async (options: { showLoading?: boolean } = {}) => {
+    const shouldShowLoading = options.showLoading ?? true;
+    if (shouldShowLoading) setLoading(true);
     setError(null);
 
     try {
@@ -146,7 +148,7 @@ export function SettingsPage() {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
     } finally {
-      setLoading(false);
+      if (shouldShowLoading) setLoading(false);
     }
   };
 
@@ -165,8 +167,13 @@ export function SettingsPage() {
 
   useEffect(() => {
     void loadSettings();
-    void refreshWorkerStatus();
   }, []);
+
+  useEffect(() => {
+    if (provider === "cloudflare" && !switchingProvider) {
+      void refreshWorkerStatus();
+    }
+  }, [provider, switchingProvider]);
 
   const selectedProviderMeta = useMemo(() => {
     return settings?.providers.find((candidate) => candidate.id === provider) ?? null;
@@ -204,7 +211,7 @@ export function SettingsPage() {
         cloudflare: cloudflarePayload,
       });
 
-      await loadSettings();
+      await loadSettings({ showLoading: false });
       setResendForm((prev) => ({ ...prev, apiKey: "" }));
       setCloudflareForm((prev) => ({ ...prev, apiToken: "" }));
     } catch (err) {
@@ -237,7 +244,7 @@ export function SettingsPage() {
 
     try {
       await api.post("settings/webhook-register", {});
-      await loadSettings();
+      await loadSettings({ showLoading: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
@@ -258,12 +265,36 @@ export function SettingsPage() {
         sendEmailBindingName: cloudflareForm.sendEmailBindingName,
       });
 
-      await Promise.all([loadSettings(), refreshWorkerStatus()]);
+      await Promise.all([
+        loadSettings({ showLoading: false }),
+        refreshWorkerStatus(),
+      ]);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
     } finally {
       setProvisioning(false);
+    }
+  };
+
+  const handleProviderChange = async (nextProvider: "resend" | "cloudflare") => {
+    if (nextProvider === provider) return;
+
+    const previousProvider = provider;
+    setProvider(nextProvider);
+    setSwitchingProvider(true);
+    setError(null);
+    setTestResult(null);
+
+    try {
+      await api.post("settings/save", { provider: nextProvider });
+      await loadSettings({ showLoading: false });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setProvider(previousProvider);
+    } finally {
+      setSwitchingProvider(false);
     }
   };
 
@@ -317,7 +348,10 @@ export function SettingsPage() {
             Active provider
             <Select
               value={provider}
-              onChange={(event) => setProvider(event.target.value as "resend" | "cloudflare")}
+              disabled={saving || switchingProvider}
+              onChange={(event) => {
+                void handleProviderChange(event.target.value as "resend" | "cloudflare");
+              }}
             >
               {settings.providers.map((item) => (
                 <option key={item.id} value={item.id}>{item.label}</option>
@@ -325,163 +359,167 @@ export function SettingsPage() {
             </Select>
           </Label>
           <div className="re-field-note">
-            Contacts/Broadcasts are available only for providers that support those capabilities.
+            Provider choice is saved immediately. Contacts/Broadcasts are available only for providers that support those capabilities.
           </div>
         </CardContent>
       </Card>
 
       <div className="re-subgrid">
         <div className="re-stack">
-          <Card>
-            <CardHeader>
-              <CardTitle>Resend configuration</CardTitle>
-            </CardHeader>
-            <CardContent className="re-stack">
-              {settings.resend.apiKey && (
-                <div className="re-field-note">
-                  Current API key: <span className="re-kbd">{settings.resend.apiKey}</span>
-                </div>
-              )}
-              <Label>
-                New Resend API key
-                <Input
-                  type="password"
-                  placeholder="re_live_... (leave blank to keep current)"
-                  value={resendForm.apiKey}
-                  onChange={(event) => setResendForm({ ...resendForm, apiKey: event.target.value })}
-                />
-              </Label>
-              <Label>
-                Default from address
-                <Input
-                  type="email"
-                  value={resendForm.fromAddress}
-                  onChange={(event) => setResendForm({ ...resendForm, fromAddress: event.target.value })}
-                />
-              </Label>
-              <Label>
-                Default from name
-                <Input
-                  value={resendForm.fromName}
-                  onChange={(event) => setResendForm({ ...resendForm, fromName: event.target.value })}
-                />
-              </Label>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Cloudflare Email Service configuration</CardTitle>
-            </CardHeader>
-            <CardContent className="re-stack">
-              {settings.cloudflare.apiToken && (
-                <div className="re-field-note">
-                  Current API credential: <span className="re-kbd">{settings.cloudflare.apiToken}</span>
-                </div>
-              )}
-              <div className="re-grid re-grid--2">
+          {provider === "resend" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Resend configuration</CardTitle>
+              </CardHeader>
+              <CardContent className="re-stack">
+                {settings.resend.apiKey && (
+                  <div className="re-field-note">
+                    Current API key: <span className="re-kbd">{settings.resend.apiKey}</span>
+                  </div>
+                )}
                 <Label>
-                  New API token or API key
+                  New Resend API key
                   <Input
                     type="password"
-                    placeholder="Cloudflare API token or Global API key"
-                    value={cloudflareForm.apiToken}
-                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, apiToken: event.target.value })}
+                    placeholder="re_live_... (leave blank to keep current)"
+                    value={resendForm.apiKey}
+                    onChange={(event) => setResendForm({ ...resendForm, apiKey: event.target.value })}
                   />
                 </Label>
                 <Label>
-                  Auth email (for Global API key)
+                  Default from address
                   <Input
                     type="email"
-                    placeholder="you@example.com"
-                    value={cloudflareForm.authEmail}
-                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, authEmail: event.target.value })}
-                  />
-                </Label>
-              </div>
-              <div className="re-grid re-grid--2">
-                <Label>
-                  Account ID
-                  <Input
-                    value={cloudflareForm.accountId}
-                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, accountId: event.target.value })}
+                    value={resendForm.fromAddress}
+                    onChange={(event) => setResendForm({ ...resendForm, fromAddress: event.target.value })}
                   />
                 </Label>
                 <Label>
-                  Zone ID
+                  Default from name
                   <Input
-                    value={cloudflareForm.zoneId}
-                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, zoneId: event.target.value })}
+                    value={resendForm.fromName}
+                    onChange={(event) => setResendForm({ ...resendForm, fromName: event.target.value })}
                   />
                 </Label>
-              </div>
-              <div className="re-grid re-grid--2">
+              </CardContent>
+            </Card>
+          )}
+
+          {provider === "cloudflare" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Cloudflare Email Service configuration</CardTitle>
+              </CardHeader>
+              <CardContent className="re-stack">
+                {settings.cloudflare.apiToken && (
+                  <div className="re-field-note">
+                    Current API credential: <span className="re-kbd">{settings.cloudflare.apiToken}</span>
+                  </div>
+                )}
+                <div className="re-grid re-grid--2">
+                  <Label>
+                    New API token or API key
+                    <Input
+                      type="password"
+                      placeholder="Cloudflare API token or Global API key"
+                      value={cloudflareForm.apiToken}
+                      onChange={(event) => setCloudflareForm({ ...cloudflareForm, apiToken: event.target.value })}
+                    />
+                  </Label>
+                  <Label>
+                    Auth email (for Global API key)
+                    <Input
+                      type="email"
+                      placeholder="you@example.com"
+                      value={cloudflareForm.authEmail}
+                      onChange={(event) => setCloudflareForm({ ...cloudflareForm, authEmail: event.target.value })}
+                    />
+                  </Label>
+                </div>
+                <div className="re-grid re-grid--2">
+                  <Label>
+                    Account ID
+                    <Input
+                      value={cloudflareForm.accountId}
+                      onChange={(event) => setCloudflareForm({ ...cloudflareForm, accountId: event.target.value })}
+                    />
+                  </Label>
+                  <Label>
+                    Zone ID
+                    <Input
+                      value={cloudflareForm.zoneId}
+                      onChange={(event) => setCloudflareForm({ ...cloudflareForm, zoneId: event.target.value })}
+                    />
+                  </Label>
+                </div>
+                <div className="re-grid re-grid--2">
+                  <Label>
+                    Sender address
+                    <Input
+                      type="email"
+                      value={cloudflareForm.fromAddress}
+                      onChange={(event) => setCloudflareForm({ ...cloudflareForm, fromAddress: event.target.value })}
+                    />
+                  </Label>
+                  <Label>
+                    Sender name
+                    <Input
+                      value={cloudflareForm.fromName}
+                      onChange={(event) => setCloudflareForm({ ...cloudflareForm, fromName: event.target.value })}
+                    />
+                  </Label>
+                </div>
+                <div className="re-grid re-grid--2">
+                  <Label>
+                    Sending domain (must be onboarded)
+                    <Input
+                      placeholder="example.com"
+                      value={cloudflareForm.sendingDomain}
+                      onChange={(event) => setCloudflareForm({ ...cloudflareForm, sendingDomain: event.target.value })}
+                    />
+                  </Label>
+                  <Label>
+                    Email Worker name
+                    <Input
+                      placeholder="emdash-email-worker"
+                      value={cloudflareForm.workerName}
+                      onChange={(event) => setCloudflareForm({ ...cloudflareForm, workerName: event.target.value })}
+                    />
+                  </Label>
+                </div>
+                <div className="re-grid re-grid--2">
+                  <Label>
+                    Route address (custom address or full email)
+                    <Input
+                      placeholder="support@example.com"
+                      value={cloudflareForm.routeAddress}
+                      onChange={(event) => setCloudflareForm({ ...cloudflareForm, routeAddress: event.target.value })}
+                    />
+                  </Label>
+                  <Label>
+                    Destination address (must be verified)
+                    <Input
+                      type="email"
+                      placeholder="inbox@example.com"
+                      value={cloudflareForm.destinationAddress}
+                      onChange={(event) => setCloudflareForm({ ...cloudflareForm, destinationAddress: event.target.value })}
+                    />
+                  </Label>
+                </div>
                 <Label>
-                  Sender address
+                  Send-email binding name
                   <Input
-                    type="email"
-                    value={cloudflareForm.fromAddress}
-                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, fromAddress: event.target.value })}
+                    value={cloudflareForm.sendEmailBindingName}
+                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, sendEmailBindingName: event.target.value })}
                   />
                 </Label>
-                <Label>
-                  Sender name
-                  <Input
-                    value={cloudflareForm.fromName}
-                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, fromName: event.target.value })}
-                  />
-                </Label>
-              </div>
-              <div className="re-grid re-grid--2">
-                <Label>
-                  Sending domain (must be onboarded)
-                  <Input
-                    placeholder="example.com"
-                    value={cloudflareForm.sendingDomain}
-                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, sendingDomain: event.target.value })}
-                  />
-                </Label>
-                <Label>
-                  Email Worker name
-                  <Input
-                    placeholder="emdash-email-worker"
-                    value={cloudflareForm.workerName}
-                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, workerName: event.target.value })}
-                  />
-                </Label>
-              </div>
-              <div className="re-grid re-grid--2">
-                <Label>
-                  Route address (custom address or full email)
-                  <Input
-                    placeholder="support@example.com"
-                    value={cloudflareForm.routeAddress}
-                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, routeAddress: event.target.value })}
-                  />
-                </Label>
-                <Label>
-                  Destination address (must be verified)
-                  <Input
-                    type="email"
-                    placeholder="inbox@example.com"
-                    value={cloudflareForm.destinationAddress}
-                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, destinationAddress: event.target.value })}
-                  />
-                </Label>
-              </div>
-              <Label>
-                Send-email binding name
-                <Input
-                  value={cloudflareForm.sendEmailBindingName}
-                  onChange={(event) => setCloudflareForm({ ...cloudflareForm, sendEmailBindingName: event.target.value })}
-                />
-              </Label>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="re-inline-actions">
             <Button onClick={() => void handleSave()} disabled={saving}>
-              {saving ? "Saving..." : "Save settings"}
+              {saving ? "Saving..." : `Save ${provider === "cloudflare" ? "Cloudflare" : "Resend"} settings`}
             </Button>
           </div>
         </div>
@@ -517,107 +555,113 @@ export function SettingsPage() {
             </CardContent>
           </Card>
 
+          {provider === "resend" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Resend webhook</CardTitle>
+              </CardHeader>
+              <CardContent className="re-stack">
+                <Notice tone={settings.resend.webhookRegistered ? "success" : "danger"}>
+                  {settings.resend.webhookRegistered ? "Registered" : "Not registered"}
+                </Notice>
+                {settings.resend.webhookId && (
+                  <div className="re-field-note">
+                    ID: <span className="re-kbd">{settings.resend.webhookId}</span>
+                  </div>
+                )}
+                {!settings.resend.webhookRegistered && (
+                  <div>
+                    <Button onClick={() => void handleRegisterWebhook()} disabled={registering}>
+                      {registering ? "Registering..." : "Register webhook"}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {provider === "cloudflare" && (
+        <>
           <Card>
             <CardHeader>
-              <CardTitle>Resend webhook</CardTitle>
+              <CardTitle>Cloudflare requirements checklist</CardTitle>
             </CardHeader>
             <CardContent className="re-stack">
-              <Notice tone={settings.resend.webhookRegistered ? "success" : "danger"}>
-                {settings.resend.webhookRegistered ? "Registered" : "Not registered"}
+              <Notice tone={settings.cloudflareReadiness.ready ? "success" : "neutral"}>
+                {settings.cloudflareReadiness.ready
+                  ? "Cloudflare provider is ready for live sending."
+                  : "Cloudflare provider is not ready yet. Complete required checks below."}
               </Notice>
-              {settings.resend.webhookId && (
-                <div className="re-field-note">
-                  ID: <span className="re-kbd">{settings.resend.webhookId}</span>
+
+              {settings.cloudflareReadiness.checks.map((check) => (
+                <div key={check.id} className="re-field-note">
+                  <strong>{check.ok ? "PASS" : (check.required ? "FAIL" : "INFO")}</strong>
+                  {" "}
+                  {check.label}
+                  {" — "}
+                  {check.detail}
                 </div>
-              )}
-              {!settings.resend.webhookRegistered && (
-                <div>
-                  <Button onClick={() => void handleRegisterWebhook()} disabled={registering}>
-                    {registering ? "Registering..." : "Register webhook"}
-                  </Button>
+              ))}
+
+              <div className="re-field-note">
+                Routing status: <span className="re-kbd">{settings.cloudflareReadiness.onboarding.routingStatus ?? "unknown"}</span>
+              </div>
+              <div className="re-field-note">
+                Sending subdomain tag: <span className="re-kbd">{settings.cloudflareReadiness.onboarding.sendingSubdomainTag ?? "not found"}</span>
+              </div>
+
+              <div className="re-inline-actions">
+                <Button onClick={() => void loadSettings()} disabled={loading}>Refresh checklist</Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Cloudflare Email Worker provisioning</CardTitle>
+            </CardHeader>
+            <CardContent className="re-stack">
+              <Notice>
+                This action uploads/updates a Worker script and creates an Email Routing rule with `Send to Worker`.
+              </Notice>
+
+              <div className="re-inline-actions">
+                <Button
+                  onClick={() => void handleProvisionWorker()}
+                  disabled={provisioning}
+                >
+                  {provisioning ? "Provisioning..." : "Create or update Email Worker"}
+                </Button>
+                <Button variant="outline" onClick={() => void refreshWorkerStatus()} disabled={refreshingWorkerStatus}>
+                  {refreshingWorkerStatus ? "Refreshing..." : "Refresh worker status"}
+                </Button>
+              </div>
+
+              {workerStatus && (
+                <div className="re-stack">
+                  <Notice tone={workerStatus.configured ? "success" : "neutral"}>
+                    {workerStatus.configured
+                      ? "Worker and routing rule are configured."
+                      : (workerStatus.reason ?? "Worker setup is incomplete.")}
+                  </Notice>
+                  <div className="re-field-note">Worker exists: <span className="re-kbd">{String(Boolean(workerStatus.workerExists))}</span></div>
+                  <div className="re-field-note">Route rule matched: <span className="re-kbd">{String(Boolean(workerStatus.routeMatched))}</span></div>
+                  <div className="re-field-note">Route rule ID: <span className="re-kbd">{workerStatus.routeRuleId ?? "n/a"}</span></div>
+                  <div className="re-field-note">Last script update: <span className="re-kbd">{workerStatus.scriptUpdatedAt ?? "n/a"}</span></div>
+                  {workerStatus.workerError && (
+                    <Notice tone="danger">Worker check error: {workerStatus.workerError}</Notice>
+                  )}
+                  {workerStatus.routeError && (
+                    <Notice tone="danger">Route check error: {workerStatus.routeError}</Notice>
+                  )}
                 </div>
               )}
             </CardContent>
           </Card>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Cloudflare requirements checklist</CardTitle>
-        </CardHeader>
-        <CardContent className="re-stack">
-          <Notice tone={settings.cloudflareReadiness.ready ? "success" : "neutral"}>
-            {settings.cloudflareReadiness.ready
-              ? "Cloudflare provider is ready for live sending."
-              : "Cloudflare provider is not ready yet. Complete required checks below."}
-          </Notice>
-
-          {settings.cloudflareReadiness.checks.map((check) => (
-            <div key={check.id} className="re-field-note">
-              <strong>{check.ok ? "PASS" : (check.required ? "FAIL" : "INFO")}</strong>
-              {" "}
-              {check.label}
-              {" — "}
-              {check.detail}
-            </div>
-          ))}
-
-          <div className="re-field-note">
-            Routing status: <span className="re-kbd">{settings.cloudflareReadiness.onboarding.routingStatus ?? "unknown"}</span>
-          </div>
-          <div className="re-field-note">
-            Sending subdomain tag: <span className="re-kbd">{settings.cloudflareReadiness.onboarding.sendingSubdomainTag ?? "not found"}</span>
-          </div>
-
-          <div className="re-inline-actions">
-            <Button onClick={() => void loadSettings()} disabled={loading}>Refresh checklist</Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Cloudflare Email Worker provisioning</CardTitle>
-        </CardHeader>
-        <CardContent className="re-stack">
-          <Notice>
-            This action uploads/updates a Worker script and creates an Email Routing rule with `Send to Worker`.
-          </Notice>
-
-          <div className="re-inline-actions">
-            <Button
-              onClick={() => void handleProvisionWorker()}
-              disabled={provisioning}
-            >
-              {provisioning ? "Provisioning..." : "Create or update Email Worker"}
-            </Button>
-            <Button variant="outline" onClick={() => void refreshWorkerStatus()} disabled={refreshingWorkerStatus}>
-              {refreshingWorkerStatus ? "Refreshing..." : "Refresh worker status"}
-            </Button>
-          </div>
-
-          {workerStatus && (
-            <div className="re-stack">
-              <Notice tone={workerStatus.configured ? "success" : "neutral"}>
-                {workerStatus.configured
-                  ? "Worker and routing rule are configured."
-                  : (workerStatus.reason ?? "Worker setup is incomplete.")}
-              </Notice>
-              <div className="re-field-note">Worker exists: <span className="re-kbd">{String(Boolean(workerStatus.workerExists))}</span></div>
-              <div className="re-field-note">Route rule matched: <span className="re-kbd">{String(Boolean(workerStatus.routeMatched))}</span></div>
-              <div className="re-field-note">Route rule ID: <span className="re-kbd">{workerStatus.routeRuleId ?? "n/a"}</span></div>
-              <div className="re-field-note">Last script update: <span className="re-kbd">{workerStatus.scriptUpdatedAt ?? "n/a"}</span></div>
-              {workerStatus.workerError && (
-                <Notice tone="danger">Worker check error: {workerStatus.workerError}</Notice>
-              )}
-              {workerStatus.routeError && (
-                <Notice tone="danger">Route check error: {workerStatus.routeError}</Notice>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </>
+      )}
 
       {error && <Notice tone="danger">{error}</Notice>}
     </div>

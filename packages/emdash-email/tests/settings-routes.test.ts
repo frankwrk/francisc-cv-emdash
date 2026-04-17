@@ -148,6 +148,22 @@ describe("handleSaveSettings", () => {
     expect(ctx.kv.set).toHaveBeenCalledWith("settings:cloudflare:zoneId", "zone_1");
     expect(ctx.kv.set).toHaveBeenCalledWith("settings:cloudflare:fromAddress", "noreply@example.com");
   });
+
+  it("persists provider selection when only provider is submitted", async () => {
+    const ctx = makeRouteMockCtx(
+      { provider: "cloudflare" },
+      {
+        method: "POST",
+        url: "https://example.com/_emdash/api/plugins/emdash-resend/settings/save",
+        kv: { "settings:provider": "resend" },
+      }
+    );
+
+    const result = await handleSaveSettings(ctx as any);
+
+    expect(result).toEqual({ success: true, provider: "cloudflare" });
+    expect(ctx.kv.set).toHaveBeenCalledWith("settings:provider", "cloudflare");
+  });
 });
 
 describe("handleGetWebhookStatus", () => {

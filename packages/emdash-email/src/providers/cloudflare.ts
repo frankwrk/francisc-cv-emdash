@@ -110,6 +110,26 @@ function normalizeRouteAddress(routeAddress: string | null, sendingDomain: strin
   return `${trimmed}@${sendingDomain.toLowerCase()}`;
 }
 
+function workerActionTargetsWorker(actionValues: string[] | undefined, workerName: string): boolean {
+  if (!actionValues || actionValues.length === 0) return false;
+  const normalizedWorkerName = workerName.trim().toLowerCase();
+
+  return actionValues.some((candidate) => {
+    const value = candidate.trim().toLowerCase();
+    return value === normalizedWorkerName
+      || value.endsWith(`/${normalizedWorkerName}`)
+      || value.endsWith(`:${normalizedWorkerName}`);
+  });
+}
+
+function isMissingWorkerError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return message.includes("worker does not exist")
+    || message.includes("could not find worker")
+    || message.includes("script not found")
+    || message.includes("does not exist on your account");
+}
+
 async function getConfig(ctx: any): Promise<CloudflareProviderConfig> {
   const [
     apiToken,
@@ -610,7 +630,7 @@ export async function provisionCloudflareWorker(
     const matcherTo = rule.matchers?.find((matcher) => matcher.type === "literal" && matcher.field === "to")?.value;
     const workerAction = rule.actions?.find((action) => action.type === "worker");
     return matcherTo?.toLowerCase() === normalizedRouteAddress.toLowerCase()
-      && workerAction?.value?.includes(patchedConfig.workerName as string);
+      && workerActionTargetsWorker(workerAction?.value, patchedConfig.workerName as string);
   });
 
   const routingRule = existingRule ?? await client.createRoutingRule(patchedConfig.zoneId, {
@@ -673,7 +693,9 @@ export async function getCloudflareWorkerStatus(ctx: any): Promise<Record<string
     await client.getWorker(config.accountId, config.workerName);
     workerExists = true;
   } catch (error) {
-    workerError = error instanceof Error ? error.message : String(error);
+    if (!isMissingWorkerError(error)) {
+      workerError = error instanceof Error ? error.message : String(error);
+    }
   }
 
   let routeRuleId: string | null = config.workerRuleId;
@@ -691,7 +713,7 @@ export async function getCloudflareWorkerStatus(ctx: any): Promise<Record<string
 
       if (!matcherValue || !normalizedRouteAddress) return false;
       return matcherValue.toLowerCase() === normalizedRouteAddress.toLowerCase()
-        && workerAction?.value?.includes(config.workerName as string);
+        && workerActionTargetsWorker(workerAction?.value, config.workerName as string);
     });
 
     if (matchedRule?.id) {
@@ -703,9 +725,20 @@ export async function getCloudflareWorkerStatus(ctx: any): Promise<Record<string
   }
 
   const scriptUpdatedAt = await ctx.kv.get("settings:cloudflare:workerScriptUpdatedAt") as string | null;
+  let reason: string | null = null;
+  if (workerError) {
+    reason = "Worker check failed. Fix the API error before provisioning.";
+  } else if (!workerExists) {
+    reason = "Worker script not found yet. Use \"Create or update Email Worker\" to provision it.";
+  } else if (routeError) {
+    reason = "Worker exists, but routing rule check failed.";
+  } else if (!routeMatched) {
+    reason = "Worker exists, but no matching Email Routing rule was found for the configured route.";
+  }
 
   return {
     configured: workerExists && routeMatched,
+    reason,
     workerName: config.workerName,
     workerExists,
     workerError,

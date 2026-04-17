@@ -77,7 +77,10 @@ pnpm dev
   - `Delivery Log`: status filters, provider-aware message ID row, open timestamp column.
   - `Contacts`: audience selector, inline add-contact form, unsubscribe/delete actions.
   - `Broadcasts`: compose panel, draft table, per-row send action.
-  - `Settings`: provider selector, Resend and Cloudflare config cards, test email, webhook registration state, Cloudflare readiness and worker provisioning.
+  - `Settings`: provider selector, provider-specific config cards, test email, provider-specific operational checks/actions.
+- Settings UX behavior:
+  - Changing provider persists immediately (the selector writes `settings:provider` via `settings/save`), so refreshes keep the selected provider.
+  - Provider panels are conditional: Resend-only sections are hidden when Cloudflare is active, and Cloudflare checklist/worker sections are hidden when Resend is active.
 
 ## Cloudflare Email Provider Setup
 
@@ -90,6 +93,7 @@ pnpm dev
 - Use the Settings page actions:
   - `Refresh checklist` to re-run readiness diagnostics.
   - `Create or update Email Worker` to provision/update worker script and routing rule in one flow.
+- Worker status checks now treat "worker does not exist yet" as an expected not-provisioned state (not a hard API error), and show a provisioning-focused reason message instead.
 
 ## Git Hygiene
 
