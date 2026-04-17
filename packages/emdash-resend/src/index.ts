@@ -84,10 +84,7 @@ export function createPlugin(): ResolvedPlugin {
     admin: {
       entry: "@frankwrk/emdash-resend/admin",
       pages: [
-        { path: "/settings", label: "Settings", icon: "settings" },
-        { path: "/deliveries", label: "Delivery Log", icon: "mail" },
-        { path: "/contacts", label: "Contacts", icon: "users" },
-        { path: "/broadcasts", label: "Broadcasts", icon: "send" },
+        { path: "/resend-email", label: "Resend Email", icon: "mail" },
       ],
       widgets: [{ id: "delivery-stats", title: "Email Delivery", size: "third" }],
     },

@@ -56,6 +56,12 @@ pnpm dev
 - If Resend webhook calls fail auth, re-register the webhook from the plugin settings so both `webhookId` and `webhookSecret` are refreshed.
 - EmDash route handlers receive parsed JSON in `ctx.input`; webhook signature verification in this plugin is performed against that JSON payload representation.
 
+## Resend Plugin Admin UI
+
+- The Resend plugin is exposed as a single Plugins entry: `Resend Email`.
+- That page contains top-left tabs for `Delivery Log`, `Contacts`, `Broadcasts`, and `Settings`.
+- The active tab is mirrored to `?tab=` in the URL for refresh-safe navigation.
+
 ## Git Hygiene
 
 This repository should not track local runtime state, generated artifacts, or secrets.
