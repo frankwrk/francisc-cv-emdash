@@ -48,7 +48,13 @@ pnpm bootstrap
 pnpm dev
 ```
 
-`pnpm dev` and `pnpm build` run a `predev` / `prebuild` step that compiles the local workspace package `@frankwrk/emdash-resend` first. This ensures its `dist/*` exports exist before Astro loads `astro.config.mjs` in fresh environments (including Cloudflare CI).
+`pnpm dev` and `pnpm build` run a `predev` / `prebuild` step that compiles the local workspace package `@frankwrk/emdash-email` first. This ensures its `dist/*` exports exist before Astro loads `astro.config.mjs` in fresh environments (including Cloudflare CI).
+
+## Email Provider Architecture Notes
+
+- The site now uses `@frankwrk/emdash-email` as the primary plugin package (provider-agnostic).
+- Runtime/plugin compatibility is intentionally preserved with plugin ID `emdash-resend` and existing route namespaces so existing data and installed plugin links continue to work.
+- `@frankwrk/emdash-resend` remains as a compatibility shim package that re-exports `@frankwrk/emdash-email`.
 
 ## Resend Webhook Notes
 
@@ -56,22 +62,30 @@ pnpm dev
 - If Resend webhook calls fail auth, re-register the webhook from the plugin settings so both `webhookId` and `webhookSecret` are refreshed.
 - EmDash route handlers receive parsed JSON in `ctx.input`; webhook signature verification in this plugin is performed against that JSON payload representation.
 
-## Resend Plugin Admin UI
+## Email Providers Admin UI
 
-- The Resend plugin is exposed as a single Plugins entry: `Resend Email`.
+- The plugin is exposed as a single Plugins entry: `Email Providers`.
 - That page contains top-left tabs for `Delivery Log`, `Contacts`, `Broadcasts`, and `Settings`.
 - The active tab is mirrored to `?tab=` in the URL for refresh-safe navigation.
-- The tab shell and page controls are now built from plugin-local shadcn-style primitives (`Button`, `Card`, `Input`, `Select`, `Textarea`, `Badge`, `Table`, `Notice`) in `packages/emdash-resend/src/components/ui.tsx`.
-- Styling is scoped in `packages/emdash-resend/src/components/resend-admin-styles.tsx` so plugin UI updates do not leak into the site theme.
+- The tab shell and page controls are built from plugin-local shadcn-style primitives (`Button`, `Card`, `Input`, `Select`, `Textarea`, `Badge`, `Table`, `Notice`) in `packages/emdash-email/src/components/ui.tsx`.
+- Styling is scoped in `packages/emdash-email/src/components/resend-admin-styles.tsx` so plugin UI updates do not leak into the site theme.
 - Complete design pass notes:
   - Upgraded typography/spacing hierarchy and state styling for a professional CMS plugin surface.
   - Added per-page metric summaries for faster operational scanning (deliverability, contacts, broadcasts, setup readiness).
   - Added accessibility-focused tab semantics (`tablist` / `tab` / `tabpanel`) for keyboard/screen-reader clarity.
 - Page details retained from the original workflow:
-  - `Delivery Log`: status filters, expandable Resend ID row, open timestamp column.
+  - `Delivery Log`: status filters, provider-aware message ID row, open timestamp column.
   - `Contacts`: audience selector, inline add-contact form, unsubscribe/delete actions.
   - `Broadcasts`: compose panel, draft table, per-row send action.
-  - `Settings`: masked API key view, sender defaults, test email, webhook registration state.
+  - `Settings`: provider selector, Resend and Cloudflare config cards, test email, webhook registration state, Cloudflare readiness and worker provisioning.
+
+## Cloudflare Email Provider Setup
+
+- Minimum required fields for sending: API token, Account ID, and sender email (`fromAddress`).
+- For inbound/routing workflows and worker setup, also set: Zone ID, sending domain, route address, destination address, worker name, and optional `sendEmailBindingName`.
+- Use the Settings page actions:
+  - `Refresh checklist` to re-run readiness diagnostics.
+  - `Create or update Email Worker` to provision/update worker script and routing rule in one flow.
 
 ## Git Hygiene
 
