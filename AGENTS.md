@@ -27,7 +27,12 @@ Agent skills are in `.agents/skills/`. Load them when working on specific tasks:
 
 - **building-emdash-site** -- Querying content, rendering Portable Text, schema design, seed files, site features (menus, widgets, search, SEO, comments, bylines). Start here.
 - **creating-plugins** -- Building EmDash plugins with hooks, storage, admin UI, API routes, and Portable Text block types.
+- **creating-themes** -- Building and distributing EmDash themes: project structure, seed file format, route conventions, field types, sample content, and distribution via create-astro.
 - **emdash-cli** -- CLI commands for content management, seeding, type generation, and visual editing flow.
+
+## Design Context
+
+Read `.impeccable.md` before doing any UI or frontend work. It contains the full design system: accent color, font system (Geist Sans + Geist Mono), dark-first theme, design principles, and aesthetic direction for this personal portfolio/blog site.
 
 ## Rules
 
