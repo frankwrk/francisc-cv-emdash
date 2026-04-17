@@ -25,6 +25,7 @@ interface ResendSettings {
 
 interface CloudflareSettings {
   apiToken: string | null;
+  authEmail: string | null;
   accountId: string | null;
   zoneId: string | null;
   fromAddress: string | null;
@@ -101,6 +102,7 @@ export function SettingsPage() {
 
   const [cloudflareForm, setCloudflareForm] = useState({
     apiToken: "",
+    authEmail: "",
     accountId: "",
     zoneId: "",
     fromAddress: "",
@@ -129,6 +131,7 @@ export function SettingsPage() {
 
       setCloudflareForm({
         apiToken: "",
+        authEmail: current.cloudflare.authEmail ?? "",
         accountId: current.cloudflare.accountId ?? "",
         zoneId: current.cloudflare.zoneId ?? "",
         fromAddress: current.cloudflare.fromAddress ?? "",
@@ -182,6 +185,7 @@ export function SettingsPage() {
       if (resendForm.apiKey) resendPayload.apiKey = resendForm.apiKey;
 
       const cloudflarePayload: Record<string, string> = {
+        authEmail: cloudflareForm.authEmail,
         accountId: cloudflareForm.accountId,
         zoneId: cloudflareForm.zoneId,
         fromAddress: cloudflareForm.fromAddress,
@@ -372,18 +376,29 @@ export function SettingsPage() {
             <CardContent className="re-stack">
               {settings.cloudflare.apiToken && (
                 <div className="re-field-note">
-                  Current API token: <span className="re-kbd">{settings.cloudflare.apiToken}</span>
+                  Current API credential: <span className="re-kbd">{settings.cloudflare.apiToken}</span>
                 </div>
               )}
-              <Label>
-                New API token
-                <Input
-                  type="password"
-                  placeholder="Cloudflare API token"
-                  value={cloudflareForm.apiToken}
-                  onChange={(event) => setCloudflareForm({ ...cloudflareForm, apiToken: event.target.value })}
-                />
-              </Label>
+              <div className="re-grid re-grid--2">
+                <Label>
+                  New API token or API key
+                  <Input
+                    type="password"
+                    placeholder="Cloudflare API token or Global API key"
+                    value={cloudflareForm.apiToken}
+                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, apiToken: event.target.value })}
+                  />
+                </Label>
+                <Label>
+                  Auth email (for Global API key)
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={cloudflareForm.authEmail}
+                    onChange={(event) => setCloudflareForm({ ...cloudflareForm, authEmail: event.target.value })}
+                  />
+                </Label>
+              </div>
               <div className="re-grid re-grid--2">
                 <Label>
                   Account ID

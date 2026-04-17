@@ -129,6 +129,7 @@ describe("handleSaveSettings", () => {
         provider: "cloudflare",
         cloudflare: {
           apiToken: "cf_token",
+          authEmail: "owner@example.com",
           accountId: "acc_1",
           zoneId: "zone_1",
           fromAddress: "noreply@example.com",
@@ -142,6 +143,7 @@ describe("handleSaveSettings", () => {
     expect(result).toEqual({ success: true, provider: "cloudflare" });
     expect(ctx.kv.set).toHaveBeenCalledWith("settings:provider", "cloudflare");
     expect(ctx.kv.set).toHaveBeenCalledWith("settings:cloudflare:apiToken", "cf_token");
+    expect(ctx.kv.set).toHaveBeenCalledWith("settings:cloudflare:authEmail", "owner@example.com");
     expect(ctx.kv.set).toHaveBeenCalledWith("settings:cloudflare:accountId", "acc_1");
     expect(ctx.kv.set).toHaveBeenCalledWith("settings:cloudflare:zoneId", "zone_1");
     expect(ctx.kv.set).toHaveBeenCalledWith("settings:cloudflare:fromAddress", "noreply@example.com");
