@@ -1,5 +1,5 @@
 {
-  "name": "@frankwrk/emdash-resend",
+  "name": "@frankwrk/emdash-email",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/descriptor.js",
@@ -13,9 +13,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@frankwrk/emdash-email": "workspace:*"
   },
   "peerDependencies": {
     "@emdash-cms/admin": "^0.4.0",
